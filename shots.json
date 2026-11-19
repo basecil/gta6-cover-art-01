@@ -1,6 +1,33 @@
 [
-  { "name": "1-cover.jpg", "source": "export", "export": "landscape", "query": "?shot=cover&layout=nine&grade=vice&photo=pier,boulevard&preview=landscape", "w": 1280, "h": 720 },
-  { "name": "2-editor.jpg", "source": "viewport", "query": "?shot=editor&layout=hero3&grade=neon&photo=pier,boulevard", "w": 1280, "h": 720 },
-  { "name": "3-cover.jpg", "source": "export", "export": "portrait", "query": "?shot=cover&layout=hero3&grade=neon&photo=pier,boulevard&preview=portrait", "w": 1024, "h": 1280 },
-  { "name": "4-cover.jpg", "source": "export", "export": "story", "query": "?shot=cover&layout=tilt&grade=golden&photo=pier,boulevard&preview=story", "w": 720, "h": 1280 }
+  {
+    "name": "1-cover.jpg",
+    "source": "export",
+    "export": "landscape",
+    "query": "?shot=cover&layout=nine&grade=vice&photo=pier,boulevard&preview=landscape",
+    "w": 1280,
+    "h": 720
+  },
+  {
+    "name": "2-editor.jpg",
+    "source": "viewport",
+    "query": "?shot=editor&layout=hero3&grade=neon&photo=boulevard,pier",
+    "w": 1280,
+    "h": 720
+  },
+  {
+    "name": "3-cover.jpg",
+    "source": "export",
+    "export": "portrait",
+    "query": "?shot=cover&layout=hero3&grade=neon&photo=boulevard,pier&preview=portrait",
+    "w": 1024,
+    "h": 1280
+  },
+  {
+    "name": "4-cover.jpg",
+    "source": "export",
+    "export": "story",
+    "query": "?shot=cover&layout=tilt&grade=golden&photo=pier,boulevard&preview=story",
+    "w": 720,
+    "h": 1280
+  }
 ]

@@ -112,35 +112,6 @@ export function splitTitle(title) {
   return [best.a, best.b];
 }
 
-/** Chooses the title's lines and point size for the masthead box. */
-export function fitTitle(ctx, title, box, forceSplit) {
-  const oneLine = splitTitle(title).join(' ');
-  const words = splitTitle(title);
-  const tracking = 0.008;
-  const widthFor = (line, size) => measure(ctx, line, size, TITLE_FACE, tracking);
-  const fitOne = () => {
-    let lo = 8;
-    let hi = Math.max(12, box.h);
-    for (let i = 0; i < 26; i++) {
-      const mid = (lo + hi) / 2;
-      if (widthFor(oneLine, mid) <= box.w && mid * 1.04 <= box.h) lo = mid;
-      else hi = mid;
-    }
-    return lo;
-  };
-  const fitLines = (lines) => {
-    const widest = Math.max(...lines.map((l) => widthFor(l, 100)));
-    const byW = (box.w / Math.max(1, widest)) * 100;
-    const byH = (box.h * 0.98) / (lines.length * 1.0);
-    return Math.min(byW, byH);
-  };
-  const single = fitOne();
-  const multi = words.length > 1 ? fitLines(words) : 0;
-  if (forceSplit && multi > single * 0.68) return { lines: words, size: multi };
-  if (multi > single * 1.16) return { lines: words, size: multi };
-  return { lines: [oneLine], size: single };
-}
-
 let grainTile = null;
 function grainPattern(ctx) {
   if (!grainTile) {
@@ -329,11 +300,33 @@ function drawMasthead(ctx, state, plan, palette, size) {
   const lineH = fsize * 1.01;
   const blockW = m.w;
   const blockH = lines.length * lineH + pad * 0.95;
+
+  const subText = (state.subtitle || '').trim();
+  let ss = 0;
+  if (hasSub) {
+    ss = Math.min(blockH * 0.30, subBand * 0.80, m.w * 0.11);
+    ss = Math.max(ss, 11);
+    while (measure(ctx, subText, ss, SCRIPT_FACE) > m.w * 0.98 && ss > 10) ss -= 1;
+  }
+  const subGap = hasSub ? subBand * 0.18 : 0;
+  const groupH = blockH + (hasSub ? subGap + ss : 0);
   const bx = m.x;
-  const by = m.y + Math.max(0, (boxH - blockH) * 0.45);
+  const by = m.y + Math.max(0, (m.h - groupH) / 2);
   const angle = plan.landscape ? 0 : -0.018;
 
-  halftoneSlab(ctx, bx, by, blockW, blockH, angle, palette);
+  if (state.halftone !== false) halftoneSlab(ctx, bx, by, blockW, blockH, angle, palette);
+  else {
+    ctx.save();
+    ctx.translate(bx + blockW / 2, by + blockH / 2);
+    ctx.rotate(angle);
+    ctx.fillStyle = palette.ink;
+    ctx.fillRect(-blockW / 2, -blockH / 2, blockW, blockH);
+    ctx.strokeStyle = rgba(palette.accent, 0.85);
+    ctx.lineWidth = Math.max(2, blockH * 0.014);
+    ctx.strokeRect(-blockW / 2 + ctx.lineWidth, -blockH / 2 + ctx.lineWidth,
+                   blockW - ctx.lineWidth * 2, blockH - ctx.lineWidth * 2);
+    ctx.restore();
+  }
 
   ctx.save();
   ctx.translate(bx + blockW / 2, by + blockH / 2);
@@ -363,15 +356,7 @@ function drawMasthead(ctx, state, plan, palette, size) {
   ctx.restore();
 
   if (hasSub) {
-    const raw = state.subtitle.trim();
-    let ss = Math.min(blockH * 0.30, subBand * 0.80, m.w * 0.11);
-    ss = Math.max(ss, 11);
-    let sw = measure(ctx, raw, ss, SCRIPT_FACE);
-    while (sw > m.w * 0.98 && ss > 10) {
-      ss -= 1;
-      sw = measure(ctx, raw, ss, SCRIPT_FACE);
-    }
-    const sy = Math.min(by + blockH + subBand * 0.52, m.y + m.h - ss * 0.45);
+    const sy = Math.min(by + blockH + subGap + ss * 0.55, m.y + m.h - ss * 0.45);
     ctx.save();
     ctx.translate(m.x + m.w / 2, sy);
     ctx.rotate(-0.026);
@@ -381,10 +366,18 @@ function drawMasthead(ctx, state, plan, palette, size) {
     ctx.shadowColor = palette.glow;
     ctx.shadowBlur = ss * 0.55;
     ctx.fillStyle = palette.glow;
-    ctx.fillText(raw, 0, 0);
-    ctx.shadowBlur = ss * 0.14;
+    ctx.fillText(subText, 0, 0);
+    // A dark outline keeps the script legible on pale grades (Golden Hour cream).
+    ctx.shadowColor = 'rgba(10,6,18,0.55)';
+    ctx.shadowBlur = ss * 0.22;
+    ctx.shadowOffsetY = ss * 0.05;
+    ctx.lineWidth = Math.max(1, ss * 0.07);
+    ctx.strokeStyle = 'rgba(10,6,18,0.72)';
+    ctx.strokeText(subText, 0, 0);
+    ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = ss * 0.12;
     ctx.fillStyle = '#fff8ec';
-    ctx.fillText(raw, 0, 0);
+    ctx.fillText(subText, 0, 0);
     ctx.restore();
   }
 }
@@ -453,7 +446,7 @@ function drawFooter(ctx, state, plan, palette, overlay = false) {
   ctx.stroke();
 
   const ribY = top + pad * 1.1;
-  const ribW = drawRibbon(ctx, state.badge, f.x, ribY, ribbonH, overlay ? { ...palette, ink: palette.paper, paper: palette.ink } : palette);
+  drawRibbon(ctx, state.badge, f.x, ribY, ribbonH, overlay ? { ...palette, ink: palette.paper, paper: palette.ink } : palette);
 
   const starR = Math.max(5, ribbonH * 0.26);
   const starsW = starR * 2 + 4 * starR * 2.6;
@@ -483,7 +476,6 @@ function drawFooter(ctx, state, plan, palette, overlay = false) {
     ctx.letterSpacing = '0px';
   }
   ctx.restore();
-  void ribW;
 }
 
 function drawCaptionBand(ctx, state, rect, palette) {

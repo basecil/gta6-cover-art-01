@@ -63,10 +63,10 @@ export function layoutPanels(id, area, gap) {
     case 'tilt': {
       const backdrop = rect(area.x, area.y, area.w, area.h);
       const snap = rect(
-        area.x + area.w * 0.115,
-        area.y + area.h * 0.10,
-        area.w * 0.77,
-        area.h * 0.80,
+        area.x + area.w * 0.30,
+        area.y + area.h * 0.24,
+        area.w * 0.62,
+        area.h * 0.64,
         { rotate: -0.055, snapshot: true },
       );
       return [backdrop, snap];

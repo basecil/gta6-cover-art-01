@@ -71,7 +71,8 @@ const $ = (id) => document.getElementById(id);
 const canvas = $('cover');
 const ctx = canvas.getContext('2d');
 const statusEl = $('status');
-const status = (message) => { statusEl.textContent = message; };
+let pendingStatus = null;
+const status = (message) => { pendingStatus = null; statusEl.textContent = message; };
 
 /* ------------------------------------------------------------------ photos */
 
@@ -146,7 +147,8 @@ function currentSize() {
   return EXPORT_SIZES.find((s) => s.id === state.preview) ?? EXPORT_SIZES[0];
 }
 
-function queueRedraw() {
+function queueRedraw(message = null) {
+  if (message) pendingStatus = message;
   if (redrawQueued) return;
   redrawQueued = true;
   requestAnimationFrame(() => {
@@ -157,7 +159,8 @@ function queueRedraw() {
       canvas.height = h;
     }
     drawCover(ctx, state, images, w, h);
-    statusEl.textContent = `Ready — ${w} × ${h}`;
+    statusEl.textContent = pendingStatus ?? `Ready — ${w} × ${h}`;
+    pendingStatus = null;
   });
 }
 
@@ -168,6 +171,7 @@ function snapshot() {
     layout: state.layout, grade: state.grade, title: state.title, subtitle: state.subtitle,
     footer: state.footer, badge: state.badge, stars: state.stars, titleStyle: state.titleStyle,
     halftone: state.halftone, grain: state.grain, vignette: state.vignette,
+    photos: state.photos.map((p) => ({ id: p.id, name: p.name, url: p.url })),
     slots: state.slots.map((s) => ({ photo: s.photo, zoom: s.zoom, ox: s.ox, oy: s.oy })),
   });
 }
@@ -175,6 +179,7 @@ function snapshot() {
 function restore(text) {
   const s = JSON.parse(text);
   Object.assign(state, s);
+  state.photos = s.photos ?? state.photos;
   ensureSlots();
   syncControls();
   queueRedraw();
@@ -193,7 +198,9 @@ function pushHistory() {
 }
 
 function commit(message) {
-  if (pushHistory() && message) status(message);
+  if (!pushHistory() || !message) return;
+  if (redrawQueued) pendingStatus = message;
+  else status(message);
 }
 
 function undo() {
@@ -203,7 +210,7 @@ function undo() {
   restore(history.pop());
   lastSnap = snapshot();
   updateHistoryButtons();
-  status('Undo');
+  queueRedraw('Undo');
 }
 
 function redo() {
@@ -212,7 +219,7 @@ function redo() {
   restore(future.pop());
   lastSnap = snapshot();
   updateHistoryButtons();
-  status('Redo');
+  queueRedraw('Redo');
 }
 
 function updateHistoryButtons() {
@@ -283,10 +290,10 @@ function download(canvasEl, size) {
 }
 
 async function exportSize(size) {
-  statusEl.textContent = `Rendering ${size.file}…`;
+  status(`Rendering ${size.file}…`);
   const rendered = renderToCanvas(state, images, size.w, size.h);
   const ok = await download(rendered, size);
-  statusEl.textContent = ok ? `Saved neon-coast-${size.file}.png` : 'Export failed';
+  status(ok ? `Saved neon-coast-${size.file}.png` : 'Export failed');
   return ok;
 }
 
@@ -295,7 +302,7 @@ async function exportAll() {
     await exportSize(size);
     await new Promise((r) => setTimeout(r, 380));
   }
-  statusEl.textContent = 'Saved all four PNGs';
+  status('Saved all four PNGs');
 }
 
 /* ------------------------------------------------------------------- UI */
@@ -590,8 +597,7 @@ function bind() {
     btn.addEventListener('click', () => {
       state.preview = btn.dataset.size;
       syncControls();
-      queueRedraw();
-      statusEl.textContent = `Preview ${currentSize().label}`;
+      queueRedraw(`Preview ${currentSize().label}`);
     });
   }
 
@@ -609,15 +615,14 @@ function bind() {
       return;
     }
     if (typing) return;
-    const rects = panelRects();
     const slot = state.slots[state.selected];
     if (!slot) return;
     const step = e.shiftKey ? 0.16 : 0.05;
     let moved = false;
-    if (e.key === 'ArrowLeft') { slot.ox = Math.max(-1, slot.ox - step); moved = true; }
-    if (e.key === 'ArrowRight') { slot.ox = Math.min(1, slot.ox + step); moved = true; }
-    if (e.key === 'ArrowUp') { slot.oy = Math.max(-1, slot.oy - step); moved = true; }
-    if (e.key === 'ArrowDown') { slot.oy = Math.min(1, slot.oy + step); moved = true; }
+    if (e.key === 'ArrowLeft') { slot.ox = Math.min(1, slot.ox + step); moved = true; }
+    if (e.key === 'ArrowRight') { slot.ox = Math.max(-1, slot.ox - step); moved = true; }
+    if (e.key === 'ArrowUp') { slot.oy = Math.min(1, slot.oy + step); moved = true; }
+    if (e.key === 'ArrowDown') { slot.oy = Math.max(-1, slot.oy - step); moved = true; }
     if (moved) {
       e.preventDefault();
       queueRedraw();
@@ -749,8 +754,6 @@ function bindCanvas() {
     const scaleY = canvas.height / box.height;
     const slot = state.slots[drag.index];
     const r = drag.rect;
-    const slackX = Math.max(1, r.w * 0.02);
-    const slackY = Math.max(1, r.h * 0.02);
     const photo = slot.photo ? images.get(slot.photo) : null;
     const iw = photo ? photo.naturalWidth || photo.width : 1;
     const ih = photo ? photo.naturalHeight || photo.height : 1;
@@ -759,10 +762,8 @@ function bindCanvas() {
     const dh = ih * cover;
     const realSlackX = Math.max(1, (dw - r.w) / 2);
     const realSlackY = Math.max(1, (dh - r.h) / 2);
-    void slackX;
-    void slackY;
-    slot.ox = Math.max(-1, Math.min(1, drag.ox + ((e.clientX - drag.startX) * scaleX) / realSlackX));
-    slot.oy = Math.max(-1, Math.min(1, drag.oy + ((e.clientY - drag.startY) * scaleY) / realSlackY));
+    slot.ox = Math.max(-1, Math.min(1, drag.ox - ((e.clientX - drag.startX) * scaleX) / realSlackX));
+    slot.oy = Math.max(-1, Math.min(1, drag.oy - ((e.clientY - drag.startY) * scaleY) / realSlackY));
     queueRedraw();
   });
 
@@ -868,10 +869,13 @@ async function boot() {
   lastSnap = snapshot();
   updateHistoryButtons();
   window.addEventListener('beforeunload', (e) => {
-    if (state.photos.length) return;
-    e.preventDefault();
+    if (!state.photos.length) return;
+    if (snapshot() !== lastSnap) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
   });
-  status('Ready — drop a photo on any panel');
+  queueRedraw('Ready — drop a photo on any panel');
 }
 
 boot().catch((err) => {
