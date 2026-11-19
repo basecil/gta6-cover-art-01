@@ -7,6 +7,9 @@
 // are free to use. Build your own GTA-style cover maker in its place, put your 3 or 4 PNG or JPEG screenshots in
 // screenshots/ (the first by name is the cover) and run it.
 //
+// Neon Coast Studio (this entry): a seven-layout, six-grade, four-size GTA-style cover
+// studio with per-panel crops, halftone lettering, heat meter and undo/redo.
+//
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
