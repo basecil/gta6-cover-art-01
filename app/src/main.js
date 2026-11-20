@@ -1,59 +1,73 @@
-// Wires the Neon Coast Studio editor: one state object, a redraw, an undo stack,
-// per-panel drag/zoom, presets and PNG export. Rendering lives in render.js.
-import { drawCover, renderToCanvas, planFrame, EXPORT_SIZES, splitTitle, __debug } from './render.js';
+// Wires the Midnight Vice editor: one state object, a redraw, an undo stack,
+// per-panel drag/zoom/crop, presets, presets and PNG export. Rendering lives in
+// render.js; every panel keeps its own photo, zoom and offset.
+import { drawCover, renderToCanvas, planFrame, EXPORT_SIZES, splitTitle, __debug, ROLE_TAGS } from './render.js';
 import { LAYOUTS, layoutPanels, panelGap, layoutById } from './layouts.js';
 import { GRADES, gradeById } from './grades.js';
 import { runShot } from './shots.js';
+import { SAMPLES } from './samples.js';
 
-const SAMPLE_FILES = ['boulevard.jpg', 'pier.jpg'];
+const SAMPLE_FILES = SAMPLES.map((s) => s.file);
 const SHUFFLE_TITLES = [
-  'Neon Shore', 'Night Shift', 'Pier Pressure', 'Sunset Heist', 'Vice Meridian',
-  'Golden Tide', 'Last Neon', 'Coastline Riot', 'Palm Static', 'Harbor Lights',
-  'Heat Wave', 'Midnight Marina', 'Salt & Chrome', 'Coral Rush', 'Afterglow Ave',
+  'Midnight Vice', 'Neon Alibi', 'After Dark', 'Vice Meridian', 'Night Ledger',
+  'Last Neon', 'Chrome Tide', 'Palm Static', 'Harbor Lights', 'Heat Wave',
+  'Leonida Nights', 'Salt & Chrome', 'Coral Rush', 'Afterglow Ave', 'Dusk Patrol',
+];
+const SHUFFLE_SUBS = [
+  'Leonida after dark', 'every night is a movie', 'no sleep on the coast',
+  'chrome and salt air', 'the city never cools', 'lights out, lights on',
 ];
 const PRESETS = [
   {
     id: 'vice-standard',
     name: 'Vice Standard',
     state: {
-      layout: 'nine', grade: 'vice', titleStyle: 'sunset', stars: 5,
-      title: 'Neon Shore', subtitle: 'the coast never sleeps', footer: 'Neon Coast Studio presents',
-      badge: 'VICE CITY', halftone: true, grain: true, vignette: true,
+      layout: 'hero', grade: 'vice', titleStyle: 'chrome', stars: 5,
+      title: 'Midnight Vice', subtitle: 'Leonida after dark', footer: 'Midnight Vice Studio presents',
+      badge: 'LEONIDA • EST. 2026', halftone: true, grain: true, vignette: true,
+      skyGlow: true, posterInk: true, compare: false,
     },
   },
   {
     id: 'midnight-run',
     name: 'Midnight Run',
     state: {
-      layout: 'hero3', grade: 'neon', titleStyle: 'white', stars: 4,
-      title: 'Night Shift', subtitle: 'after dark, everything glows', footer: 'A Neon Coast picture',
-      badge: 'EST. 2026', halftone: true, grain: true, vignette: true,
+      layout: 'hero3', grade: 'midnight', titleStyle: 'white', stars: 4,
+      title: 'Night Shift', subtitle: 'after dark, everything glows', footer: 'A Midnight Vice picture',
+      badge: 'LEONIDA • EST. 2026', halftone: true, grain: true, vignette: true,
+      skyGlow: true, posterInk: true, compare: false,
     },
   },
   {
-    id: 'palm-sunday',
-    name: 'Palm Sunday',
+    id: 'afterdark-noir',
+    name: 'Afterdark Noir',
     state: {
-      layout: 'triptych', grade: 'palm', titleStyle: 'sunset', stars: 4,
-      title: 'Palm Static', subtitle: 'sun, salt, static', footer: 'Neon Coast Studio presents',
-      badge: 'COAST LINE', halftone: true, grain: true, vignette: true,
+      layout: 'slash', grade: 'afterdark', titleStyle: 'sunset', stars: 4,
+      title: 'Palm Static', subtitle: 'lights out, lights on', footer: 'Midnight Vice Studio presents',
+      badge: 'LEONIDA • EST. 2026', halftone: true, grain: true, vignette: true,
+      skyGlow: false, posterInk: true, compare: false,
     },
   },
 ];
 
 const state = {
-  layout: 'nine',
-  grade: 'vice',
-  title: 'Neon Shore',
-  subtitle: 'the coast never sleeps',
-  footer: 'Neon Coast Studio presents',
-  badge: 'VICE CITY',
+  layout: 'hero',
+  grade: 'midnight',
+  title: 'Midnight Vice',
+  subtitle: 'Leonida after dark',
+  footer: 'Midnight Vice Studio presents',
+  badge: 'LEONIDA • EST. 2026',
   stars: 5,
-  titleStyle: 'sunset',
+  titleStyle: 'chrome',
   halftone: true,
   grain: true,
   vignette: true,
-  preview: 'square',
+  skyGlow: true,
+  posterInk: true,
+  compare: false,
+  roleTags: true,
+  roles: ['LUCIA', 'JASON', 'THE CITY', 'LEONIDA', 'AFTER DARK', 'THE GETAWAY', 'NIGHT SHIFT', 'THE COAST', 'VICE'],
+  preview: 'landscape',
   selected: 0,
   slots: [],
   photos: [],
@@ -85,10 +99,10 @@ function ensureSlots() {
   while (state.slots.length < n) state.slots.push({ photo: null, zoom: 1, ox: 0, oy: 0 });
 }
 
-function addImage(img, name) {
+function addImage(img, name, file, face) {
   const id = `p${++photoSeq}`;
   images.set(id, img);
-  state.photos.push({ id, name, url: img.src });
+  state.photos.push({ id, name, file, face: face ?? null, url: img.src });
   return id;
 }
 
@@ -107,25 +121,22 @@ async function addFile(file) {
   const url = URL.createObjectURL(file);
   try {
     const img = await loadImage(url);
-    return addImage(img, file.name.replace(/\.[^.]+$/, ''));
+    return addImage(img, file.name.replace(/\.[^.]+$/, ''), file.name, null);
   } catch (err) {
     status(`Could not read ${file.name}`);
     return null;
   }
 }
 
-async function addSample() {
-  const photo = state.photos.length % SAMPLE_FILES.length;
-  const name = SAMPLE_FILES[photo];
-  try {
-    const img = await loadImage(`./samples/${name}?v=2`);
-    const id = addImage(img, name.replace('.jpg', ''));
-    const free = state.slots.findIndex((slot) => !slot.photo);
-    assign(id, free >= 0 ? free : state.selected);
-    commit(`Sample ${name} added`);
-  } catch {
-    status('Sample photo missing');
-  }
+async function loadSamples() {
+  await Promise.all(SAMPLES.map(async (sample) => {
+    try {
+      const img = await loadImage(`./assets/${sample.file}`);
+      addImage(img, sample.name, sample.file, sample.face);
+    } catch {
+      /* a missing sample just leaves the count short */
+    }
+  }));
 }
 
 function assign(photoId, slotIndex) {
@@ -137,6 +148,7 @@ function assign(photoId, slotIndex) {
   slot.zoom = 1;
   slot.ox = 0;
   slot.oy = 0;
+  slot.focus = null;
   if (photoId) state.selected = slotIndex;
   return old;
 }
@@ -171,8 +183,10 @@ function snapshot() {
     layout: state.layout, grade: state.grade, title: state.title, subtitle: state.subtitle,
     footer: state.footer, badge: state.badge, stars: state.stars, titleStyle: state.titleStyle,
     halftone: state.halftone, grain: state.grain, vignette: state.vignette,
-    photos: state.photos.map((p) => ({ id: p.id, name: p.name, url: p.url })),
-    slots: state.slots.map((s) => ({ photo: s.photo, zoom: s.zoom, ox: s.ox, oy: s.oy })),
+    skyGlow: state.skyGlow, posterInk: state.posterInk, compare: state.compare,
+    roleTags: state.roleTags,
+    photos: state.photos.map((p) => ({ id: p.id, name: p.name, file: p.file, face: p.face, url: p.url })),
+    slots: state.slots.map((s) => ({ photo: s.photo, zoom: s.zoom, ox: s.ox, oy: s.oy, focus: s.focus ?? null })),
   });
 }
 
@@ -225,13 +239,12 @@ function redo() {
 function updateHistoryButtons() {
   const dis = history.length === 0;
   const dis2 = future.length === 0;
-  for (const id of ['undo', 'undo2']) $(id).disabled = dis;
-  for (const id of ['redo', 'redo2']) $(id).disabled = dis2;
+  for (const id of ['undo', 'undo2']) { const el = $(id); if (el) el.disabled = dis; }
+  for (const id of ['redo', 'redo2']) { const el = $(id); if (el) el.disabled = dis2; }
 }
 
 /* ------------------------------------------------------------------ panels */
 
-/** Canvas-space rects for the current layout (with rotation applied for hit tests). */
 function panelRects() {
   const { w, h } = currentSize();
   const frame = planFrame(state.layout, w, h);
@@ -279,7 +292,7 @@ function download(canvasEl, size) {
       }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `neon-coast-${size.file}.png`;
+      a.download = `midnight-vice-${size.file}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -293,7 +306,7 @@ async function exportSize(size) {
   status(`Rendering ${size.file}…`);
   const rendered = renderToCanvas(state, images, size.w, size.h);
   const ok = await download(rendered, size);
-  status(ok ? `Saved neon-coast-${size.file}.png` : 'Export failed');
+  status(ok ? `Saved midnight-vice-${size.file}.png` : 'Export failed');
   return ok;
 }
 
@@ -322,7 +335,12 @@ function buildLayoutPicker() {
     btn.appendChild(mini);
     const tag = document.createElement('span');
     tag.className = 'tag';
-    tag.textContent = layout.name.replace('Nine-Panel', '9-up').replace('Four-Panel', '4-up');
+    tag.textContent = layout.name
+      .replace('Full-Bleed Hero', 'Hero')
+      .replace('Nine-Panel', '9-up')
+      .replace('Four-Panel', '4-up')
+      .replace('Whole Cast', 'Cast')
+      .replace('Slashed Comic', 'Slash');
     btn.appendChild(tag);
     grid.appendChild(btn);
     drawLayoutMini(mini, layout.id);
@@ -351,10 +369,23 @@ function drawLayoutMini(mini, id) {
     }
     const shade = 26 + ((i * 23) % 40);
     g.fillStyle = r.kind === 'caption' ? '#2b2340' : `rgb(${shade + 14}, ${shade}, ${shade + 30})`;
-    g.fillRect(r.x, r.y, r.w, r.h);
-    g.strokeStyle = '#c9b8e8';
-    g.lineWidth = 1;
-    g.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    if (r.skew) {
+      g.beginPath();
+      g.moveTo(r.x + r.skew, r.y);
+      g.lineTo(r.x + r.w + r.skew, r.y);
+      g.lineTo(r.x + r.w, r.y + r.h);
+      g.lineTo(r.x, r.y + r.h);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = '#c9b8e8';
+      g.lineWidth = 1;
+      g.stroke();
+    } else {
+      g.fillRect(r.x, r.y, r.w, r.h);
+      g.strokeStyle = '#c9b8e8';
+      g.lineWidth = 1;
+      g.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    }
     g.restore();
   });
   g.fillStyle = '#f6ead4';
@@ -456,21 +487,6 @@ function buildPhotoList() {
       queueRedraw();
       commit(`Placed ${photo.name} in panel ${state.selected + 1}`);
     });
-    chip.addEventListener('dblclick', () => {
-      list.removeChild(chip);
-      state.photos = state.photos.filter((p) => p.id !== photo.id);
-      state.slots.forEach((s) => {
-        if (s.photo === photo.id) {
-          s.photo = null;
-          s.zoom = 1;
-          s.ox = 0;
-          s.oy = 0;
-        }
-      });
-      syncControls();
-      queueRedraw();
-      commit('Photo removed');
-    });
     list.appendChild(chip);
   });
 }
@@ -523,6 +539,10 @@ function syncControls() {
   $('halftone').checked = state.halftone !== false;
   $('grain').checked = state.grain !== false;
   $('vignette').checked = state.vignette !== false;
+  $('skyGlow').checked = state.skyGlow !== false;
+  $('roleTags').checked = state.roleTags !== false;
+  $('posterInk').checked = state.posterInk !== false;
+  $('compare').checked = Boolean(state.compare);
   $('layoutName').textContent = layoutById(state.layout).name;
   $('photoCount').textContent = `${state.photos.length} / 9`;
   $('panelName').textContent = `Panel ${state.selected + 1}`;
@@ -576,13 +596,18 @@ function bind() {
   bindText('footer', 'footer', 'Footer updated');
   bindText('badge', 'badge', 'Ribbon updated');
 
-  for (const id of ['halftone', 'grain', 'vignette']) {
+  for (const id of ['halftone', 'roleTags', 'grain', 'vignette', 'skyGlow', 'posterInk']) {
     $(id).addEventListener('change', (e) => {
       state[id] = e.target.checked;
       queueRedraw();
       commit(`${id} ${e.target.checked ? 'on' : 'off'}`);
     });
   }
+  $('compare').addEventListener('change', (e) => {
+    state.compare = e.target.checked;
+    queueRedraw();
+    commit(`Before/after ${e.target.checked ? 'on' : 'off'}`);
+  });
 
   for (const btn of document.querySelectorAll('#titleStyle button')) {
     btn.addEventListener('click', () => {
@@ -619,10 +644,10 @@ function bind() {
     if (!slot) return;
     const step = e.shiftKey ? 0.16 : 0.05;
     let moved = false;
-    if (e.key === 'ArrowLeft') { slot.ox = Math.min(1, slot.ox + step); moved = true; }
-    if (e.key === 'ArrowRight') { slot.ox = Math.max(-1, slot.ox - step); moved = true; }
-    if (e.key === 'ArrowUp') { slot.oy = Math.min(1, slot.oy + step); moved = true; }
-    if (e.key === 'ArrowDown') { slot.oy = Math.max(-1, slot.oy - step); moved = true; }
+    if (e.key === 'ArrowLeft') { slot.ox = Math.max(-1, slot.ox - step); moved = true; }
+    if (e.key === 'ArrowRight') { slot.ox = Math.min(1, slot.ox + step); moved = true; }
+    if (e.key === 'ArrowUp') { slot.oy = Math.max(-1, slot.oy - step); moved = true; }
+    if (e.key === 'ArrowDown') { slot.oy = Math.min(1, slot.oy + step); moved = true; }
     if (moved) {
       e.preventDefault();
       queueRedraw();
@@ -634,6 +659,7 @@ function bind() {
         s.zoom = 1;
         s.ox = 0;
         s.oy = 0;
+        s.focus = null;
         syncControls();
         queueRedraw();
         commit('Panel cleared');
@@ -647,14 +673,31 @@ function bind() {
     state.layout = otherLayouts[Math.floor(Math.random() * otherLayouts.length)].id;
     state.grade = otherGrades[Math.floor(Math.random() * otherGrades.length)].id;
     state.title = SHUFFLE_TITLES[Math.floor(Math.random() * SHUFFLE_TITLES.length)];
-    state.subtitle = ['every night is a movie', 'sunset on repeat', 'no sleep on the coast', 'chrome and salt air'][
-      Math.floor(Math.random() * 4)
-    ];
-    state.titleStyle = Math.random() > 0.4 ? 'sunset' : 'white';
+    state.subtitle = SHUFFLE_SUBS[Math.floor(Math.random() * SHUFFLE_SUBS.length)];
+    state.titleStyle = ['chrome', 'sunset', 'white'][Math.floor(Math.random() * 3)];
     ensureSlots();
     syncControls();
     queueRedraw();
     commit('Shuffled the deck');
+  });
+
+  $('surprise').addEventListener('click', () => {
+    // "Surprise me": gives every panel its own photo and its own crop in one go.
+    ensureSlots();
+    const n = state.slots.length;
+    const crops = [
+      [1.05, 0.02, -0.08], [1.18, -0.32, 0.22], [1.09, 0.28, -0.25],
+      [1.26, 0.15, 0.30], [1.03, -0.13, -0.32], [1.15, 0.34, 0.10],
+      [1.13, -0.26, -0.18], [1.22, 0.07, 0.28], [1.01, -0.05, 0.03],
+    ];
+    for (let i = 0; i < n; i++) {
+      const photo = state.photos[(i + Math.floor(Math.random() * state.photos.length)) % state.photos.length];
+      const [zoom, ox, oy] = crops[i % crops.length];
+      state.slots[i] = { photo: photo?.id ?? null, zoom, ox, oy, focus: null };
+    }
+    syncControls();
+    queueRedraw();
+    commit('Surprised every panel');
   });
 
   $('fileInput').addEventListener('change', async (e) => {
@@ -687,7 +730,7 @@ function bind() {
   $('addSample').addEventListener('click', addSample);
   $('clearPhotos').addEventListener('click', () => {
     state.photos = [];
-    state.slots = state.slots.map(() => ({ photo: null, zoom: 1, ox: 0, oy: 0 }));
+    state.slots = state.slots.map(() => ({ photo: null, zoom: 1, ox: 0, oy: 0, focus: null }));
     syncControls();
     queueRedraw();
     commit('Photos cleared');
@@ -708,6 +751,7 @@ function bind() {
     if (!slot) return;
     slot.ox = 0;
     slot.oy = 0;
+    slot.focus = null;
     queueRedraw();
     commit('Crop re-centered');
   });
@@ -719,6 +763,28 @@ function bind() {
   $('exportAll').addEventListener('click', exportAll);
 
   bindCanvas();
+}
+
+async function addSample() {
+  const free = state.slots.findIndex((s) => !s.photo);
+  const photo = state.photos.length % Math.max(1, state.photos.length || 1);
+  // Cycle through the shipped samples so each press adds a new night scene.
+  const next = SAMPLES[photo % SAMPLES.length];
+  if (!state.photos.some((p) => p.file === next.file)) {
+    try {
+      const img = await loadImage(`./assets/${next.file}`);
+      const id = addImage(img, next.name, next.file, next.face);
+      assign(id, free >= 0 ? free : state.selected);
+      commit(`Sample ${next.name} added`);
+      syncControls();
+      queueRedraw();
+      return;
+    } catch {
+      status('Sample photo missing');
+      return;
+    }
+  }
+  status('All samples are already in the tray');
 }
 
 /** Pointer drag on a panel, wheel zoom at the pointer. */
@@ -762,8 +828,11 @@ function bindCanvas() {
     const dh = ih * cover;
     const realSlackX = Math.max(1, (dw - r.w) / 2);
     const realSlackY = Math.max(1, (dh - r.h) / 2);
-    slot.ox = Math.max(-1, Math.min(1, drag.ox - ((e.clientX - drag.startX) * scaleX) / realSlackX));
-    slot.oy = Math.max(-1, Math.min(1, drag.oy - ((e.clientY - drag.startY) * scaleY) / realSlackY));
+    // Dragging right moves the photo right (and down for down): the offset is
+    // the photo's own position, so a positive delta adds to it.
+    slot.focus = null; // a drag takes over from a face anchor
+    slot.ox = Math.max(-1, Math.min(1, drag.ox + ((e.clientX - drag.startX) * scaleX) / realSlackX));
+    slot.oy = Math.max(-1, Math.min(1, drag.oy + ((e.clientY - drag.startY) * scaleY) / realSlackY));
     queueRedraw();
   });
 
@@ -833,30 +902,32 @@ async function boot() {
   bind();
   ensureSlots();
 
-  await Promise.all(SAMPLE_FILES.map((name, i) =>
-    loadImage(`./samples/${name}?v=2`)
-      .then((img) => addImage(img, name.replace('.jpg', '')))
-      .catch(() => null)
-      .then(() => i),
-  ));
+  await loadSamples();
 
-  // Seed a starter composition using both samples, repeated where the panel
-  // count needs it, so the editor is never empty on first load.
-  const seed = ['p1', 'p2'];
+  // Seed the opening composition: the full-bleed hero first (the app OPENS on
+  // the hero layout with the face framed), then each remaining panel gets its
+  // OWN photo and its OWN crop, never a shared one.
+  const byName = (n) => state.photos.find((p) => p.name === n)?.id ?? null;
+  const seed = ['hero', 'street', 'neon', 'car', 'palm', 'beach', 'skyline', 'motel'];
   const crops = [
-    [1.02, 0, 0], [1.18, 0.34, -0.22], [1.10, -0.30, 0.20],
-    [1.24, 0.18, 0.28], [1.06, -0.12, -0.30], [1.16, 0.0, 0.34],
-    [1.08, 0.30, 0.10], [1.20, -0.26, -0.18], [1.04, 0.0, 0.0],
+    [1.04, 0.00, 0.00, 'face'], [1.14, -0.30, 0.22], [1.06, 0.26, -0.24],
+    [1.22, 0.14, 0.28], [1.02, -0.12, -0.30], [1.10, 0.32, 0.10],
+    [1.08, -0.24, -0.16], [1.18, 0.06, 0.26], [1.00, -0.04, 0.02],
   ];
   const n = slotCount(state.layout);
   for (let i = 0; i < n; i++) {
-    const [zoom, ox, oy] = crops[i % crops.length];
-    state.slots[i] = { photo: seed[i % seed.length], zoom, ox, oy };
+    const [zoom, ox, oy, focus] = crops[i % crops.length];
+    const id = byName(seed[i % seed.length]);
+    const photo = state.photos.find((p) => p.id === id);
+    state.slots[i] = {
+      photo: id, zoom, ox, oy,
+      focus: focus === 'face' && photo?.face ? photo.face : null,
+    };
   }
 
   syncControls();
   queueRedraw();
-  window.__studio = { state, images, EXPORT_SIZES, splitTitle, __debug, drawCover, planFrame, renderToCanvas };
+  window.__studio = { state, images, EXPORT_SIZES, splitTitle, __debug, drawCover, planFrame, renderToCanvas, ROLE_TAGS, syncControls, queueRedraw, setLayout };
 
   const query = new URLSearchParams(location.search);
   const shot = query.get('shot');

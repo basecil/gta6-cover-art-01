@@ -1,16 +1,20 @@
-// Seven poster layouts. Each turns the panel region of the poster into photo
-// rectangles in canvas pixels, with the cream gutter already taken out as gaps.
-// Pure geometry (no DOM), so the same code lays out the live preview, the export
-// and the little layout diagrams in the rail.
+// Ten poster layouts for Midnight Vice. Each turns the panel field into photo
+// rectangles in canvas pixels with the cream gutter already taken out as gaps.
+// Pure geometry (no DOM), so the live preview, the export and the rail diagrams
+// all lay out from the same numbers. The default is the full-bleed hero: one
+// photo, edge to edge, with the lettering sitting over the art.
 
 export const LAYOUTS = [
+  { id: 'hero', name: 'Full-Bleed Hero', hint: 'One photo, title over the art', slots: 1 },
   { id: 'nine', name: 'Nine-Panel', hint: '3 x 3 poster grid', slots: 9 },
   { id: 'four', name: 'Four-Panel', hint: '2 x 2 grid', slots: 4 },
   { id: 'hero3', name: 'Hero + Three', hint: 'Wide hero over three', slots: 4 },
-  { id: 'full', name: 'Full Bleed', hint: 'One photo, edge to edge', slots: 1 },
   { id: 'tilt', name: 'Tilted Snap', hint: 'A print on a backdrop', slots: 2 },
   { id: 'triptych', name: 'Triptych', hint: 'Three tall panels', slots: 3 },
   { id: 'heroCaption', name: 'Hero + Caption', hint: 'Hero with a caption band', slots: 1 },
+  { id: 'slash', name: 'Slashed Comic', hint: 'Diagonal comic bands', slots: 3 },
+  { id: 'cast', name: 'Whole Cast', hint: 'Six faces, one poster', slots: 6 },
+  { id: 'slant', name: 'Slanted Panels', hint: 'Skewed prints, staggered', slots: 4 },
 ];
 
 export const LAYOUT_IDS = LAYOUTS.map((layout) => layout.id);
@@ -38,10 +42,14 @@ function rows(area, count, gap) {
 
 /**
  * Photo rectangles for a layout inside `area` ({x,y,w,h} in canvas pixels).
- * A panel may carry `rotate` (radians, around its centre) or `kind: 'caption'`.
+ * A panel may carry `rotate` (radians, around its centre), `skew` (a horizontal
+ * offset in pixels that slants its sides into a parallelogram) or
+ * `kind: 'caption'`.
  */
 export function layoutPanels(id, area, gap) {
   switch (id) {
+    case 'hero':
+      return [rect(area.x, area.y, area.w, area.h, { bleed: true })];
     case 'nine': {
       const out = [];
       for (const row of rows(area, 3, gap)) out.push(...columns(row, 3, gap));
@@ -58,8 +66,6 @@ export function layoutPanels(id, area, gap) {
       const below = columns(rect(area.x, area.y + heroH + gap, area.w, area.h - heroH - gap), 3, gap);
       return [hero, ...below];
     }
-    case 'full':
-      return [rect(area.x, area.y, area.w, area.h, { bleed: true })];
     case 'tilt': {
       const backdrop = rect(area.x, area.y, area.w, area.h);
       const snap = rect(
@@ -79,6 +85,46 @@ export function layoutPanels(id, area, gap) {
         rect(area.x, area.y, area.w, heroH),
         rect(area.x, area.y + heroH + gap, area.w, area.h - heroH - gap, { kind: 'caption' }),
       ];
+    }
+    case 'slash': {
+      // Three comic bands cut on a diagonal, each a parallelogram that runs a
+      // little past the panel field so the slant never shows a bare corner.
+      const bandH = (area.h - gap * 2) / 3;
+      const skew = area.w * 0.085;
+      const out = [];
+      for (let i = 0; i < 3; i++) {
+        const y = area.y + i * (bandH + gap);
+        out.push(rect(area.x - skew - 2, y, area.w + skew * 2 + 4, bandH, { skew: skew * (i % 2 ? -1 : 1) }));
+      }
+      return out;
+    }
+    case 'cast': {
+      // Six faces: a wide top row of three and a matching bottom row, the whole
+      // cast in one poster.
+      const out = [];
+      for (const row of rows(area, 2, gap)) out.push(...columns(row, 3, gap));
+      return out;
+    }
+    case 'slant': {
+      // Four prints, each skewed into a parallelogram and staggered column by
+      // column so the field reads as a slanted contact sheet.
+      const colW = (area.w - gap * 1.4) / 2;
+      const rowH = (area.h - gap * 1.4) / 2;
+      const skew = colW * 0.10;
+      const out = [];
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+          const shift = (r === 0 ? 1 : -1) * rowH * 0.045;
+          out.push(rect(
+            area.x + c * (colW + gap * 1.4) + skew * 0.8,
+            area.y + r * (rowH + gap * 1.4) + shift,
+            colW - skew * 1.6,
+            rowH - Math.abs(shift) * 2,
+            { skew: c === r ? skew : -skew },
+          ));
+        }
+      }
+      return out;
     }
     default:
       return layoutPanels('nine', area, gap);
