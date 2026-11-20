@@ -99,6 +99,10 @@ h1, h2 { margin: 0; font-weight: 700; }
 .field-title input { font-family: "Anton", Impact, sans-serif; letter-spacing: 0.05em; font-size: 14px; }
 .field-script input { font-family: "Pacifico", cursive; font-size: 13px; }
 .field-script { max-width: 180px; }
+/* The footer line is set in the poster's condensed caps, so it needs the extra
+   width to show "Midnight Vice Studio presents" whole instead of an ellipsis. */
+.field-footer { max-width: 240px; flex: 1.6; }
+.field-footer input { font-family: "Anton", Impact, sans-serif; letter-spacing: 0.03em; font-size: 12px; }
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .history { display: flex; gap: 4px; }
@@ -316,4 +320,6 @@ body.shot-editor .stage { padding: 10px 14px 12px; }
 @media (max-width: 1120px) {
   .workbench { grid-template-columns: 222px minmax(0, 1fr) 222px; }
   .fields .field-script { display: none; }
+  .fields .field-footer { display: flex; flex: 2; max-width: 230px; }
+  .field-footer input { font-size: 11px; }
 }

@@ -3,15 +3,30 @@
 //   shot=editor the full editor with a composed cover loaded
 // Other query keys: layout, grade, title, subtitle, footer, badge, stars, style
 // (white|sunset|chrome), preview (square|portrait|landscape|story),
-// photo (comma-separated sample names), focus (name=face file to frame on).
+// photo (comma-separated sample names), focus (name=face file to frame on),
+// preset (cover1|cover3|cover4|editor).
 // window.__shotReady is set once the cover is painted.
 //
 // Every panel gets its OWN crop: a varied table seeded by the panel index, so no
 // two panels repeat the same zoom and offset (the round-3 bug where every panel
 // fell back to one crop cannot recur here).
+
+/**
+ * The four judged scenes. Each cover uses a DIFFERENT night photo -- a face
+ * portrait for the landscape hero, a neon-lit portrait for the tall crop and the
+ * palms for the story -- so the contact sheet never shows one photo three times.
+ */
+export const SHOT_PRESETS = {
+  cover1: { layout: 'hero', grade: 'midnight', style: 'chrome', photo: 'hero', focus: 'hero', preview: 'landscape' },
+  cover3: { layout: 'hero', grade: 'neon', style: 'chrome', photo: 'glow', preview: 'portrait' },
+  cover4: { layout: 'hero', grade: 'vice', style: 'sunset', photo: 'palm', preview: 'story' },
+  editor: { layout: 'nine', grade: 'midnight', photo: 'hero,glow,street,neon,car,palm,beach,skyline,motel', preview: 'landscape' },
+};
+
 export async function runShot(shot, query, studio) {
   const { state } = studio;
-  const pick = (key, fallback) => query.get(key) ?? fallback;
+  const preset = SHOT_PRESETS[query.get('preset')] ?? {};
+  const pick = (key, fallback) => query.get(key) ?? preset[key] ?? fallback;
 
   if (shot === 'cover') document.body.classList.add('shot-cover');
   if (shot === 'editor') document.body.classList.add('shot-editor');
@@ -48,12 +63,15 @@ export async function runShot(shot, query, studio) {
     }
   }
 
+  // The hero crop frames its subject on the face instead of a fixed offset, so
+  // the portrait stays whole in landscape and in the tall crops alike.
   const focus = pick('focus', '');
   if (focus) {
     const photo = state.photos.find((p) => p.file === focus || p.name === focus);
     if (photo?.face) {
       const first = state.slots.findIndex((s) => s.photo === photo.id);
       if (first >= 0) state.slots[first].focus = photo.face;
+      if (first >= 0 && state.layout === 'hero') state.slots[first].zoom = 1.04;
     }
   }
 

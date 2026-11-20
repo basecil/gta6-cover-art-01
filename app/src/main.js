@@ -66,7 +66,7 @@ const state = {
   posterInk: true,
   compare: false,
   roleTags: true,
-  roles: ['LUCIA', 'JASON', 'THE CITY', 'LEONIDA', 'AFTER DARK', 'THE GETAWAY', 'NIGHT SHIFT', 'THE COAST', 'VICE'],
+  roles: ['LUCIA', 'NEON ALLEY', 'OCEAN DRIVE', 'THE CITY', 'SIGN DISTRICT', 'THE GETAWAY', 'PALM NIGHTS', 'THE COAST', 'LAST EXIT'],
   preview: 'landscape',
   selected: 0,
   slots: [],
@@ -99,10 +99,10 @@ function ensureSlots() {
   while (state.slots.length < n) state.slots.push({ photo: null, zoom: 1, ox: 0, oy: 0 });
 }
 
-function addImage(img, name, file, face) {
+function addImage(img, name, file, face, role = null) {
   const id = `p${++photoSeq}`;
   images.set(id, img);
-  state.photos.push({ id, name, file, face: face ?? null, url: img.src });
+  state.photos.push({ id, name, file, face: face ?? null, role, url: img.src });
   return id;
 }
 
@@ -132,7 +132,7 @@ async function loadSamples() {
   await Promise.all(SAMPLES.map(async (sample) => {
     try {
       const img = await loadImage(`./assets/${sample.file}`);
-      addImage(img, sample.name, sample.file, sample.face);
+      addImage(img, sample.name, sample.file, sample.face, sample.role);
     } catch {
       /* a missing sample just leaves the count short */
     }
@@ -185,7 +185,7 @@ function snapshot() {
     halftone: state.halftone, grain: state.grain, vignette: state.vignette,
     skyGlow: state.skyGlow, posterInk: state.posterInk, compare: state.compare,
     roleTags: state.roleTags,
-    photos: state.photos.map((p) => ({ id: p.id, name: p.name, file: p.file, face: p.face, url: p.url })),
+    photos: state.photos.map((p) => ({ id: p.id, name: p.name, file: p.file, face: p.face, role: p.role ?? null, url: p.url })),
     slots: state.slots.map((s) => ({ photo: s.photo, zoom: s.zoom, ox: s.ox, oy: s.oy, focus: s.focus ?? null })),
   });
 }
@@ -773,7 +773,7 @@ async function addSample() {
   if (!state.photos.some((p) => p.file === next.file)) {
     try {
       const img = await loadImage(`./assets/${next.file}`);
-      const id = addImage(img, next.name, next.file, next.face);
+      const id = addImage(img, next.name, next.file, next.face, next.role);
       assign(id, free >= 0 ? free : state.selected);
       commit(`Sample ${next.name} added`);
       syncControls();
@@ -908,7 +908,7 @@ async function boot() {
   // the hero layout with the face framed), then each remaining panel gets its
   // OWN photo and its OWN crop, never a shared one.
   const byName = (n) => state.photos.find((p) => p.name === n)?.id ?? null;
-  const seed = ['hero', 'street', 'neon', 'car', 'palm', 'beach', 'skyline', 'motel'];
+  const seed = ['hero', 'glow', 'street', 'neon', 'car', 'palm', 'beach', 'skyline', 'motel'];
   const crops = [
     [1.04, 0.00, 0.00, 'face'], [1.14, -0.30, 0.22], [1.06, 0.26, -0.24],
     [1.22, 0.14, 0.28], [1.02, -0.12, -0.30], [1.10, 0.32, 0.10],

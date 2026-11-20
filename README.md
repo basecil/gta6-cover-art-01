@@ -34,15 +34,16 @@ Then open http://localhost:8080 in a desktop browser. Pick photos with **Upload 
 | `screenshots/1-cover.jpg` — landscape export, full-bleed hero, Midnight Neon | `screenshots/2-editor.jpg` — the editor |
 | `screenshots/3-cover.jpg` — portrait export, full-bleed hero | `screenshots/4-cover.jpg` — story export, full-bleed hero |
 
-Everything in `app/` is offline: fonts are vendored (Anton and Pacifico, OFL), the eight sample photos ship with the app under `app/assets/`, and no request leaves the page at runtime.
+Everything in `app/` is offline: fonts are vendored (Anton and Pacifico, OFL), the nine sample photos ship with the app under `app/assets/`, and no request leaves the page at runtime.
 
 ## Sample photo credits
 
-The eight night sample photos in `app/assets/` were fetched at build time from [Openverse](https://api.openverse.org) (CC-licensed, no key) and are vendored so the app stays offline. Each keeps its licence:
+The nine night sample photos in `app/assets/` were fetched at build time from [Openverse](https://api.openverse.org) (CC-licensed, no key) and are vendored so the app stays offline. Each keeps its licence:
 
 | File | Title | Creator | Provider | Licence |
 |---|---|---|---|---|
-| `hero.jpg` | Portrait Chubby Jackson, Esquire Club | libraryofcongress | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `hero.jpg` | Woman Nightlife | Matt Moloney | stocksnap | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `glow.jpg` | Woman Neon | Teddy Tavan | stocksnap | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `street.jpg` | Neon Street | Ethan Brooke | stocksnap | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `neon.jpg` | Free neon signs night Tokyo | — | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `beach.jpg` | Galaxy, starry beach night, rocks | — | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
@@ -69,4 +70,4 @@ MAKEFUN_OUTPUT_DIR=out node main.ts
 
 ## License
 
-The make.fun dossier library is provided by the kit; fonts are under the SIL Open Font License (see `app/fonts/OFL-*.txt`); the eight sample photos keep the licences listed above. Everything else is original to this entry. See `LICENSE`.
+The make.fun dossier library is provided by the kit; fonts are under the SIL Open Font License (see `app/fonts/OFL-*.txt`); the nine sample photos keep the licences listed above. Everything else is original to this entry. See `LICENSE`.

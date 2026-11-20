@@ -17,11 +17,21 @@ export const EXPORT_SIZES = [
 export const TITLE_FACE = '"Anton", "Arial Narrow", Impact, sans-serif';
 export const SCRIPT_FACE = '"Pacifico", "Brush Script MT", cursive';
 
-/** Role tags printed beside each panel, in panel order. */
+/**
+ * Fallback role tags, in panel order. A shipped sample carries its own tag (see
+ * samples.js) so the label always names the photo under it -- a street scene is
+ * never tagged with a character's name; this list only covers uploaded photos.
+ */
 export const ROLE_TAGS = [
-  'LUCIA', 'JASON', 'THE CITY', 'LEONIDA', 'AFTER DARK', 'THE GETAWAY',
-  'NIGHT SHIFT', 'THE COAST', 'VICE',
+  'LUCIA', 'NEON ALLEY', 'OCEAN DRIVE', 'THE CITY', 'SIGN DISTRICT',
+  'THE GETAWAY', 'PALM NIGHTS', 'THE COAST', 'LAST EXIT',
 ];
+
+/** The caption for a panel: the photo's own tag first, then a positional one. */
+export function panelRole(state, slot, index) {
+  const photo = slot?.photo ? state.photos?.find((p) => p.id === slot.photo) : null;
+  return photo?.role || state.roles?.[index] || ROLE_TAGS[index % ROLE_TAGS.length];
+}
 
 /**
  * Where the masthead, panel field and footer sit for a canvas size. A landscape
@@ -352,7 +362,7 @@ function drawPanels(ctx, state, plan, palette, graded, size) {
       ctx.stroke();
     }
     if (!rect.bleed && image && state.roleTags !== false) {
-      drawRoleTag(ctx, rect, state.roles?.[i] ?? ROLE_TAGS[i % ROLE_TAGS.length], palette, size);
+      drawRoleTag(ctx, rect, panelRole(state, slot, i), palette, size);
     }
     ctx.restore();
   });
