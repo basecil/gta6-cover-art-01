@@ -58,7 +58,9 @@ export function layoutPanels(id, area, gap) {
     case 'mosaic': {
       // One dominant hero on the right, a stack of three down the left and a
       // wide strip along the bottom -- five panels, every edge slanted.
-      const hw = area.w * 0.655;
+      // The hero panel is capped at 44% of the cover width so the mosaic keeps
+      // at least half the width: a wider hero panel would sit over the title.
+      const hw = Math.min(area.w * 0.655, area.w * 0.44);
       const hero = rect(area.x + area.w - hw, area.y, hw, area.h * 0.78, { hero: true, skew: -slant });
       const leftW = area.w - hw - gap * 0.4;
       const thirdH = (area.h * 0.78 - gap * 2) / 3;

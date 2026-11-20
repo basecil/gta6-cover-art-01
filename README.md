@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/gta6-cover-art-01/basecil/gta6-cover-art-01/rank.svg)](https://make.fun/bounty/gta6-cover-art-01)
 [![reward](https://make.fun/badge/gta6-cover-art-01/basecil/gta6-cover-art-01/reward.svg)](https://make.fun/bounty/gta6-cover-art-01)
 
-A golden-hour GTA-style cover studio for the [Make GTA 6 Cover Art](https://make.fun/bounty/gta6-cover-art-01) bounty: drop in a photo and it opens on a hero-mosaic key-art poster — five slanted panels with one dominant sunlit face, the striped-chrome title over the art, and the hero cut out in front of it — then lets you build a grid, a comic, a triptych or any of ten layouts and export a PNG at whatever size you need. No build step, no network, no account: plain static files on a tiny Node server.
+A golden-hour GTA-style cover studio for the [Make GTA 6 Cover Art](https://make.fun/bounty/gta6-cover-art-01) bounty: drop in a photo and it opens on a hero-mosaic key-art poster — five slanted panels with one dominant sunlit face, the striped-chrome title over the art, and the hero cut out over the grid beneath that title — then lets you build a grid, a comic, a triptych or any of ten layouts and export a PNG at whatever size you need. No build step, no network, no account: plain static files on a tiny Node server.
 
 Competition entry: https://make.fun/bounty/gta6-cover-art-01
 
@@ -22,7 +22,7 @@ Then open http://localhost:8080 in a desktop browser. The eight sunlit sample ph
 - **8 sun-tuned grades** — Golden Hour (the default), Coral Dusk, Vice Sunset, Sunset Strip, Heatwave, Palm Teal, Neon Night and Mono Noir; one palette across every panel, and every grade keeps faces on a warm skin band.
 - **Striped-chrome lettering** — Anton title in a cream→yellow→orange gradient with magenta and purple stripes through the lower half, a thick dark outline and a sparkle, set **over** the art; a hot-pink Pacifico script subtitle overlaps the title base; editable title, subtitle, footer, badge ribbon and press quote.
 - **Retail kit** — gold starburst seal ("ORIGINAL COVER ART ★★★"), barcode, billing block ("A SUNFLARE PICTURES PRODUCTION · STARRING YOU"), a five-star press quote, a **VOL. 1** ticket tab and a **COMING SOON** line; every piece is its own toggle and all are on by default.
-- **Pop-out hero** — cuts the hero out larger than its panel and sets it **in front of** the title; on by default in the hero-mosaic layout.
+- **Pop-out hero** — cuts the hero out larger than its panel and pops it out over the grid while the title still paints **on top**; on by default in the hero-mosaic layout.
 - **4 export sizes** — 1080×1080 square, 1080×1350 portrait, 1920×1080 landscape, 1080×1920 story, each exported on its own or all at once.
 - **Per-panel crops** — drag a panel to reposition, scroll to zoom, swap its photo, or re-center; every panel keeps its own crop, and role tags print beside each panel.
 - **Golden finish** — sky glow, poster ink frame, optional halftone plate, film grain and vignette, plus a **before/after** toggle that shows the original photo against the graded one.

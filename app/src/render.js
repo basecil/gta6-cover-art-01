@@ -4,9 +4,9 @@
 // network.
 //
 // The look is a golden-hour key-art collage: the photo field runs edge to edge,
-// a striped-chrome title sits OVER the art, the pop-out hero breaks in front of
-// it, and a retail band along the bottom carries the billing block, barcode and
-// press quote the way a real poster does.
+// a striped-chrome title sits OVER the art, the pop-out hero breaks out of the
+// grid beneath that title, and a retail band along the bottom carries the
+// billing block, barcode and press quote the way a real poster does.
 
 import { layoutPanels, panelGap } from './layouts.js';
 import { gradeById, gradeLut, skinScore, skinTone, rgba, mixHex } from './grades.js';
@@ -69,14 +69,16 @@ export function planFrame(layoutId, width, height) {
   }
 
   // A tall sheet sets the title across the lower-middle of the art, the way a
-  // key-art poster does, so the hero's face in the top third stays clear of the
-  // pink script. The press quote sits just above it, the retail band below.
+  // key-art poster does. The hero's face sits in the upper part of its panel
+  // (see photoAnchor), so the masthead starts below it. The press quote lives
+  // in the clear band just above the billing footer -- never across the face.
   const inset = Math.round(width * 0.055);
+  const quoteH = Math.round(height * 0.062);
   return {
     landscape, tall, margin, bandH,
     bleed: layoutId === 'hero',
-    masthead: { x: inset, y: Math.round(height * 0.452), w: width - inset * 2, h: Math.round(height * (tall > 1.5 ? 0.268 : 0.272)) },
-    quote: { x: inset, y: Math.round(height * 0.352), w: width - inset * 2, h: Math.round(height * 0.072) },
+    masthead: { x: inset, y: Math.round(height * 0.49), w: width - inset * 2, h: Math.round(height * 0.235) },
+    quote: { x: inset, y: height - bandH - quoteH - Math.round(height * 0.020), w: width - inset * 2, h: quoteH },
     band: { x: 0, y: height - bandH, w: width, h: bandH },
     footer: { x: inset, y: height - bandH, w: width - inset * 2, h: bandH },
     panels: { x: 0, y: 0, w: width, h: height },
@@ -84,10 +86,11 @@ export function planFrame(layoutId, width, height) {
 }
 
 /** Where a framed face sits inside its panel: right of centre on a landscape
- *  sheet (the title takes the left), lower-centre on a tall one. */
+ *  sheet (the title takes the left), upper-centre on a tall one so the masthead
+ *  and the press quote both sit clear of the face. */
 export function photoAnchor(plan) {
   if (plan.landscape) return { x: 0.52, y: 0.40 };
-  return { x: 0.5, y: 0.56 };
+  return { x: 0.5, y: 0.34 };
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -792,8 +795,9 @@ function drawTicketTab(ctx, x, y, w, h, palette, label = 'VOL. 1') {
 
 /**
  * The five-star press quote. On a landscape sheet it sits in the top-left
- * corner over the art; on a tall sheet it sits under the title. Stars first,
- * then the quote, then the paper that said it.
+ * corner over the art; on a tall sheet it sits in the clear band just above the
+ * billing footer. Neither position crosses the hero's face. Stars first, then
+ * the quote, then the paper that said it.
  */
 function drawPressQuote(ctx, state, plan, palette, size) {
   const q = plan.quote;
@@ -959,11 +963,11 @@ function drawVignette(ctx, w, h, palette) {
 }
 
 /**
- * The pop-out hero: the hero panel's photo cut out at a larger scale and drawn
- * IN FRONT of the title, so the subject breaks the grid the way a key-art
- * cut-out does. A soft shadow under it and a fade into the retail band keep it
- * from looking pasted on. Tall sheets clip it below the title so the lettering
- * stays clean.
+ * The pop-out hero: the hero panel's photo cut out at a larger scale so the
+ * subject breaks the grid the way a key-art cut-out does. It is painted before
+ * the masthead, so the title always sits on top of it -- the hero never hides
+ * the lettering. A soft shadow under it and a fade into the retail band keep it
+ * from looking pasted on. Tall sheets clip it below the title band.
  */
 function drawPopout(ctx, state, plan, palette, graded, size) {
   if (!state.popout) return;
@@ -1098,8 +1102,10 @@ export function drawCover(ctx, state, images, width, height) {
 
   if (state.posterInk !== false) drawInkFrame(ctx, plan, palette, size);
 
-  drawMasthead(ctx, state, plan, palette, size);
+  // The hero pops out larger than its panel, but the title always paints on
+  // top of it: the winning formula is a huge gradient title OVER the art.
   drawPopout(ctx, state, plan, palette, graded, size);
+  drawMasthead(ctx, state, plan, palette, size);
 
   if (state.kit?.quote) drawPressQuote(ctx, state, plan, palette, size);
   drawSealTop(ctx, state, plan, palette, size);

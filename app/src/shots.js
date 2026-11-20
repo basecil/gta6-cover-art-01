@@ -12,9 +12,9 @@
 
 /**
  * The four judged scenes, all golden hour: the landscape cover is the hero
- * mosaic (the app's own default) with the sunlit hero popped out in front of the
- * title; the tall crops restack the same cast so the contact sheet never shows
- * one photo three times.
+ * mosaic (the app's own default) with the sunlit hero popped out over its panel
+ * while the title still paints on top; the tall crops restack the same cast so
+ * the contact sheet never shows one photo three times.
  */
 export const SHOT_PRESETS = {
   cover1: { layout: 'mosaic', grade: 'golden', style: 'chrome', preview: 'landscape', popout: true, photo: 'hero,beach,car,pool,tower' },
@@ -55,7 +55,7 @@ export async function runShot(shot, query, studio) {
   // A per-panel crop table with genuinely different values for each index; the
   // photo rotates through the picked list so the cast varies too.
   const CROPS = [
-    [1.04, 0.02, -0.06], [1.19, -0.34, 0.24], [1.09, 0.30, -0.26],
+    [1.04, 0.00, 0.00], [1.19, -0.34, 0.24], [1.09, 0.30, -0.26],
     [1.27, 0.16, 0.32], [1.04, -0.14, -0.34], [1.16, 0.36, 0.12],
     [1.13, -0.28, -0.20], [1.24, 0.08, 0.30], [1.02, -0.06, 0.04],
   ];
