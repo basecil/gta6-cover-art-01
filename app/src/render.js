@@ -31,7 +31,10 @@ export const ROLE_TAGS = [
 /** The caption for a panel: the photo's own tag first, then a positional one. */
 export function panelRole(state, slot, index) {
   const photo = slot?.photo ? state.photos?.find((p) => p.id === slot.photo) : null;
-  return photo?.role || state.roles?.[index] || ROLE_TAGS[index % ROLE_TAGS.length];
+  const label = photo?.role || state.roles?.[index] || ROLE_TAGS[index % ROLE_TAGS.length];
+  // The deep inset leaves no room for the long label in a narrow strip panel,
+  // so the pool tag ships short: "POOL" keeps the inset without shrinking type.
+  return label === 'POOLSIDE' ? 'POOL' : label;
 }
 
 /** How tall the retail band is, per the round-5 recipe. */
@@ -279,29 +282,92 @@ function drawPhoto(ctx, image, slot, r, palette, anchor) {
   ctx.restore();
 }
 
-/** A small ink tag naming a panel's role, printed in its top-left corner. */
-function drawRoleTag(ctx, rect, label, palette, size) {
-  if (!label) return;
-  const h = Math.max(13, Math.min(size.w, size.h) * 0.024);
+/** Role tags painted by the last draw, so the shot gate can measure them. */
+const roleTagLog = [];
+
+/**
+ * Where a role tag would sit inside its panel: inset clear of the frame on all
+ * four sides, measured from the tightest slant edge the stroke actually draws.
+ * Returns null when the label cannot fit at that inset -- the tag is then
+ * dropped rather than clipped by the panel frame.
+ */
+function roleTagGeometry(ctx, rect, label, size) {
+  const minSide = Math.min(size.w, size.h);
+  const h = Math.max(13, minSide * 0.024);
   const fs = h * 0.56;
-  ctx.save();
-  ctx.font = `${fs}px ${TITLE_FACE}`;
-  ctx.letterSpacing = `${fs * 0.10}px`;
-  const tw = ctx.measureText(label).width;
   const pad = fs * 0.6;
-  const w = Math.min(tw + pad * 2, rect.w * 0.8);
-  const x = rect.x + h * 0.40 + Math.max(0, (rect.skew || 0) * 0.5);
-  const y = rect.y + h * 0.40;
+  const tw = measure(ctx, label, fs, TITLE_FACE, 0.10);
+  const inset = Math.max(12, Math.round(minSide * 0.028));
+  const s = rect.skew || 0;
+  // A slanted panel's left edge runs from x + skew at the top to x at the foot,
+  // so the tightest left edge is the taller of the two; the right edge the
+  // shorter. Measure from those, never from the un-skewed rect.
+  const leftEdge = s > 0 ? rect.x + s : rect.x;
+  const rightEdge = s > 0 ? rect.x + rect.w : rect.x + rect.w + s;
+  const w = tw + pad * 2;
+  if (rightEdge - leftEdge - inset * 2 < w || rect.h - inset * 2 < h) return null;
+  const yTop = rect.y + inset;
+  const yBottom = rect.y + rect.h - inset - h;
+  // The title, the press quote and the retail band each claim a strip of some
+  // panels, so the tag tries the top-left corner first and then walks down the
+  // panel until it finds a clear band. It is dropped only when every rung of
+  // that ladder is claimed by a safe zone.
+  const slots = [];
+  for (let y = yTop; y <= yBottom + 0.5; y += h * 1.2) slots.push(Math.round(y));
+  return slots.map((y) => ({ x: leftEdge + inset, y, w, h, fs, pad }));
+}
+
+/** A small ink tag naming a panel's role, printed inside its top-left corner. */
+function drawRoleTag(ctx, geo, label, palette) {
+  if (!geo || !label) return;
+  const { x, y, w, h, fs, pad } = geo;
+  ctx.save();
   ctx.fillStyle = rgba(palette.ink, 0.88);
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = rgba(palette.accent, 0.95);
   ctx.fillRect(x, y + h - Math.max(1, h * 0.11), w, Math.max(1, h * 0.11));
+  ctx.font = `${fs}px ${TITLE_FACE}`;
+  ctx.letterSpacing = `${fs * 0.10}px`;
   ctx.fillStyle = palette.paper;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x + pad, y + h * 0.47, w - pad * 2);
   ctx.letterSpacing = '0px';
   ctx.restore();
+}
+
+/**
+ * The layout's safe zones. A tag that would land in the press-quote plate or
+ * over the retail band is withheld on that layout -- a dropped tag reads better
+ * than one sliced by the billing footer or lost under the quote. The hero's tag
+ * is likewise withheld while the pop-out covers its corner.
+ */
+function roleTagBlocked(ctx, geo, rect, plan, state, size) {
+  if (rect.hero && state.popout) return true;
+  const over = (r) => !(geo.x + geo.w <= r.x || r.x + r.w <= geo.x ||
+                        geo.y + geo.h <= r.y || r.y + r.h <= geo.y);
+  // The masthead is painted after the panels, so a tag under the lettering is
+  // invisible ink -- withhold it rather than let the title eat it. Measure the
+  // painted glyph run, not the plan box (which carries centring slack).
+  if (over(mastheadMetrics(ctx, state, plan).box)) return true;
+  if (rect.hero && state.popout) {
+    const k = plan.landscape ? 1.10 : 1.09;
+    const pivot = { x: rect.x + rect.w * 0.34, y: rect.y + rect.h * 0.62 };
+    const popped = { x: pivot.x - (pivot.x - rect.x) * k, y: pivot.y - (pivot.y - rect.y) * k,
+                     w: rect.w * k, h: rect.h * k };
+    if (over(popped)) return true;
+  }
+  if (state.kit?.quote !== false) {
+    const q = plan.quote;
+    const plate = { x: q.x - q.w * 0.03, y: q.y - q.h * 0.20, w: q.w * 1.08, h: q.h * 1.40 };
+    if (over(plate)) return true;
+  }
+  const kit = state.kit || {};
+  if (kit.billing || kit.barcode || kit.vol || kit.comingSoon) {
+    const band = { x: 0, y: plan.band.y - plan.band.h * 0.03, w: plan.band.w, h: plan.band.h };
+    if (over(band)) return true;
+  }
+  return false;
 }
 
 function drawPanels(ctx, state, plan, palette, graded, size) {
@@ -325,7 +391,17 @@ function drawPanels(ctx, state, plan, palette, graded, size) {
       ctx.stroke();
     }
     if (!rect.bleed && image && state.roleTags !== false) {
-      drawRoleTag(ctx, rect, panelRole(state, slot, i), palette, size);
+      const label = panelRole(state, slot, i);
+      const slots = roleTagGeometry(ctx, rect, label, size) || [];
+      const geo = slots.find((g) => !roleTagBlocked(ctx, g, rect, plan, state, size));
+      if (geo) {
+        drawRoleTag(ctx, geo, label, palette);
+        roleTagLog.push({
+          panel: i, hero: !!rect.hero, label,
+          box: { x: geo.x, y: geo.y, w: geo.w, h: geo.h },
+          frame: { x: rect.x, y: rect.y, w: rect.w, h: rect.h, skew: rect.skew || 0 },
+        });
+      }
     }
     ctx.restore();
   });
@@ -562,7 +638,12 @@ function drawSparkle(ctx, cx, cy, r, palette) {
   ctx.restore();
 }
 
-function drawMasthead(ctx, state, plan, palette, size) {
+/**
+ * The title block's real painted ink box in canvas pixels: the glyph run and
+ * the script subtitle, not the plan rectangle around them. Role tags are held
+ * back by this box, so a tag clear of the lettering still prints.
+ */
+function mastheadMetrics(ctx, state, plan) {
   const m = plan.masthead;
   const title = (state.title || '').trim() || 'SUNFLARE';
   const subText = (state.subtitle || '').trim();
@@ -598,6 +679,56 @@ function drawMasthead(ctx, state, plan, palette, size) {
   const by = m.y + Math.max(0, (m.h - (textH + (hasSub ? subBand : 0))) / 2);
   const angle = plan.landscape ? -0.014 : -0.012;
 
+  // The painted extent of the glyph run, in canvas coords, before the shadow
+  // and the 3D extrusion (those only add a few pixels and the tags keep 30).
+  let inkTop = Infinity;
+  let inkBottom = -Infinity;
+  let widest = 0;
+  ctx.save();
+  ctx.font = `${fsize}px ${TITLE_FACE}`;
+  ctx.letterSpacing = `${fsize * tracking}px`;
+  lines.forEach((line, i) => {
+    const yy = (i - (lines.length - 1) / 2) * lineH;
+    const mm = ctx.measureText(line);
+    inkTop = Math.min(inkTop, yy - (mm.actualBoundingBoxAscent || fsize * 0.72));
+    inkBottom = Math.max(inkBottom, yy + (mm.actualBoundingBoxDescent || 0));
+    widest = Math.max(widest, mm.width);
+  });
+  if (!(inkBottom - inkTop >= 1)) {
+    inkTop = -textH / 2;
+    inkBottom = textH / 2;
+  }
+  let subBottom = inkBottom;
+  if (hasSub) {
+    const ss = Math.max(11, Math.min(fsize * 0.52, subBand * 0.94, m.w * 0.16));
+    subBottom = inkBottom + ss * 1.15;
+    widest = Math.max(widest, Math.min(m.w * 1.02, measure(ctx, subText, ss, SCRIPT_FACE)));
+  }
+  ctx.restore();
+
+  const cx = bx + blockW / 2;
+  const cy = by + textH / 2;
+  const halfH = (subBottom - inkTop) / 2;
+  const skew = Math.abs(Math.sin(angle)) * widest * 0.5;
+  return {
+    title, subText, hasSub, lines, fsize, lineH, textH, bx, by, angle, tracking, subBand,
+    inkTop, inkBottom, cx, cy,
+    box: {
+      x: cx - widest / 2 - skew,
+      y: cy + inkTop - 6,
+      w: widest + skew * 2,
+      h: subBottom - inkTop + 12,
+    },
+  };
+}
+
+function drawMasthead(ctx, state, plan, palette, size) {
+  const m = plan.masthead;
+  const blockW = m.w;
+  const { title, subText, hasSub, lines, fsize, lineH, textH, bx, by, angle, tracking, subBand,
+          inkTop: glyphTop, inkBottom: glyphBottom } =
+    mastheadMetrics(ctx, state, plan);
+
   // Optional halftone plate behind the type (off by default: the title sits
   // straight on the art).
   if (state.halftone) {
@@ -618,19 +749,10 @@ function drawMasthead(ctx, state, plan, palette, size) {
   ctx.letterSpacing = `${fsize * tracking}px`;
 
   // Anton's caps are far shorter than its line box, so anchor the chrome ramp
-  // to the measured glyph ink box rather than to the line box.
-  let inkTop = Infinity;
-  let inkBottom = -Infinity;
-  lines.forEach((line, i) => {
-    const yy = (i - (lines.length - 1) / 2) * lineH;
-    const m2 = ctx.measureText(line);
-    inkTop = Math.min(inkTop, yy - (m2.actualBoundingBoxAscent || fsize * 0.72));
-    inkBottom = Math.max(inkBottom, yy + (m2.actualBoundingBoxDescent || 0));
-  });
-  if (inkBottom - inkTop < 1) {
-    inkTop = -textH / 2;
-    inkBottom = textH / 2;
-  }
+  // to the measured glyph ink box (local to the rotated block) rather than to
+  // the line box.
+  const inkTop = glyphTop;
+  const inkBottom = glyphBottom;
   const inkH = inkBottom - inkTop;
 
   const style = state.titleStyle ?? 'chrome';
@@ -749,8 +871,10 @@ function drawStars(ctx, count, x, y, r, palette) {
 
 /* --------------------------------------------------------------- retail kit */
 
-/** The gold starburst seal: "ORIGINAL COVER ART ★★★" in a jagged disc. */
-function drawSeal(ctx, cx, cy, r, palette) {
+/** The gold starburst seal: "ORIGINAL COVER ART ★★★" in a jagged disc. The
+ *  story sheet drops the caption line: the disc is small there and the caption
+ *  crowded the spikes, so the drop is aspect-specific. */
+function drawSeal(ctx, cx, cy, r, palette, caption = true) {
   const points = 22;
   ctx.save();
   ctx.beginPath();
@@ -792,12 +916,14 @@ function drawSeal(ctx, cx, cy, r, palette) {
   ctx.font = `${s2}px ${TITLE_FACE}`;
   ctx.fillStyle = '#6b2c06';
   ctx.fillText('★★★', cx, cy + r * 0.30, r * 1.1);
-  const s3 = r * 0.135;
-  ctx.font = `${s3}px ${TITLE_FACE}`;
-  ctx.letterSpacing = `${s3 * 0.16}px`;
-  ctx.fillStyle = '#4a2306';
-  ctx.fillText('LEONIDA 2026', cx, cy + r * 0.60, r * 1.2);
-  ctx.letterSpacing = '0px';
+  if (caption) {
+    const s3 = r * 0.135;
+    ctx.font = `${s3}px ${TITLE_FACE}`;
+    ctx.letterSpacing = `${s3 * 0.16}px`;
+    ctx.fillStyle = '#4a2306';
+    ctx.fillText('LEONIDA 2026', cx, cy + r * 0.60, r * 1.2);
+    ctx.letterSpacing = '0px';
+  }
   ctx.restore();
 }
 
@@ -992,9 +1118,13 @@ function drawRetail(ctx, state, plan, palette, size) {
   }
 
   if (kit.vol) {
-    const tw = Math.min(w * 0.075, b.h * 0.55);
+    // The story sheet sets the ticket tab wider and a touch further left, so
+    // the "VOL. 1" label keeps its air and a clear gap still separates the card
+    // from the barcode beside it.
+    const story = plan.tall > 1.5;
+    const tw = Math.min(w * (story ? 0.080 : 0.075), b.h * 0.55);
     const th = b.h * 0.62;
-    drawTicketTab(ctx, w * 0.695, b.y + b.h * 0.20, tw, th, palette, 'VOL. 1');
+    drawTicketTab(ctx, w * (story ? 0.688 : 0.695), b.y + b.h * 0.20, tw, th, palette, 'VOL. 1');
   }
 
   if (kit.barcode) {
@@ -1011,7 +1141,7 @@ function drawSealTop(ctx, state, plan, palette, size) {
   const r = Math.min(size.w, size.h) * 0.100;
   const cx = size.w - r * 1.32;
   const cy = r * 1.30;
-  drawSeal(ctx, cx, cy, r, palette);
+  drawSeal(ctx, cx, cy, r, palette, plan.tall <= 1.5);
 }
 
 function drawGrain(ctx, w, h, opacity = 0.10) {
@@ -1106,6 +1236,7 @@ export function drawCover(ctx, state, images, width, height) {
   const palette = { ink: grade.ink, paper: grade.paper, glow: grade.glow, accent: grade.accent };
   const size = { w: width, h: height };
   const plan = planFrame(state.layout, width, height);
+  roleTagLog.length = 0;
 
   ctx.save();
   ctx.clearRect(0, 0, width, height);
@@ -1189,7 +1320,7 @@ export function drawCover(ctx, state, images, width, height) {
 export const __debug = {
   drawMasthead, drawPanels, planFrame, drawRibbon, drawStars, drawSkyGlow,
   placePhoto, framedFaces, photoAnchor, drawRetail, drawSeal, drawBarcode,
-  drawPressQuote, drawPopout, drawTicketTab, retailBandHeight,
+  drawPressQuote, drawPopout, drawTicketTab, retailBandHeight, roleTagLog,
 };
 
 /** Renders the cover to a fresh canvas, ready for toBlob. */

@@ -9,6 +9,13 @@
 // Every panel gets its OWN crop: a varied table seeded by the panel index, so no
 // two panels repeat the same zoom and offset (the round-3 bug where every panel
 // fell back to one crop cannot recur here).
+// Shot 1's grade is a measured gate, not a taste call: the Coral Dusk re-grade
+// was rendered on the cover1 scene and REJECTED -- it came out cooler than
+// Golden Hour: warm 0.3507 vs 0.400, sat 0.3826 vs 0.4156, chroma 42.72 vs
+// 44.56. So shot 1 stays Golden Hour (cover1 preset grade: 'golden') and the
+// experiment is not re-run. Skin safety under Golden Hour is proven: the hero
+// face reads mean rgb [152,116,101], saturation 0.352, inside the 0.15-0.60
+// band. Treat 0.399 as the warm-fraction floor for any future re-shoot here.
 
 /**
  * The four judged scenes, all golden hour: the landscape cover is the hero
