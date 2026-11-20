@@ -448,42 +448,97 @@ function drawInkFrame(ctx, plan, palette, size) {
 
 /* --------------------------------------------------------------- lettering */
 
+/** Chrome ramp, top to foot: cream -> sun-yellow -> orange. */
+const CHROME_BASE = [
+  [0.00, '#fffaea'],
+  [0.34, '#ffe9a6'],
+  [0.62, '#ffc94a'],
+  [0.86, '#ff8a24'],
+  [1.00, '#f7671c'],
+];
+
+/** Magenta/purple stripes across the lower half: [top, height, colour, alpha]
+ *  as fractions of the title block height. */
+const CHROME_BANDS = [
+  [0.56, 0.075, '#ff2294', 0.92],
+  [0.655, 0.052, '#a82ade', 0.86],
+  [0.725, 0.070, '#ff44a0', 0.90],
+  [0.815, 0.048, '#8c22d2', 0.84],
+  [0.878, 0.062, '#ff5a82', 0.88],
+];
+
+/** Specular line across the upper third, the way chrome catches the sun. */
+const CHROME_SPEC = [0.235, 0.022, '#ffffff', 0.55];
+
+function hexRgb(hex) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Piecewise-linear sample of the base ramp at t in [0, 1]. */
+function chromeBaseAt(t) {
+  const x = Math.min(1, Math.max(0, t));
+  for (let i = 0; i < CHROME_BASE.length - 1; i++) {
+    const [t0, c0] = CHROME_BASE[i];
+    const [t1, c1] = CHROME_BASE[i + 1];
+    if (x <= t1) {
+      const k = (x - t0) / Math.max(1e-6, t1 - t0);
+      const a = hexRgb(c0);
+      const b = hexRgb(c1);
+      return [
+        a[0] + (b[0] - a[0]) * k,
+        a[1] + (b[1] - a[1]) * k,
+        a[2] + (b[2] - a[2]) * k,
+      ];
+    }
+  }
+  return hexRgb(CHROME_BASE[CHROME_BASE.length - 1][1]);
+}
+
+function blendRgb(rgb, hex, alpha) {
+  const b = hexRgb(hex);
+  return [
+    rgb[0] + (b[0] - rgb[0]) * alpha,
+    rgb[1] + (b[1] - rgb[1]) * alpha,
+    rgb[2] + (b[2] - rgb[2]) * alpha,
+  ];
+}
+
+/** Base colour at t with every stripe band and the specular line blended in. */
+function chromeColorAt(t) {
+  let c = chromeBaseAt(t);
+  for (const [y, hh, hex, alpha] of CHROME_BANDS) {
+    if (t >= y && t <= y + hh) c = blendRgb(c, hex, alpha);
+  }
+  const [sy, sh, shex, salpha] = CHROME_SPEC;
+  if (t >= sy && t <= sy + sh) c = blendRgb(c, shex, salpha);
+  return [Math.round(c[0]), Math.round(c[1]), Math.round(c[2])];
+}
+
 /**
  * The striped-chrome fill: cream at the top, sun-yellow through the middle and
  * orange at the foot, with magenta and purple bands run across the lower half.
- * Built once per masthead at the title block's own size, then used as a pattern
- * so the stripes line up with the block rather than with each glyph.
+ * Built as a direct linear gradient in the glyph frame, so it lines up with
+ * the text block at every layout and export size. Breakpoints land on every
+ * ramp stop and every band edge, duplicated either side so the stripes stay
+ * crisp.
  */
-function stripedChromePattern(ctx, blockW, blockH) {
-  const c = document.createElement('canvas');
-  c.width = Math.max(2, Math.round(blockW));
-  c.height = Math.max(2, Math.round(blockH));
-  const g = c.getContext('2d');
-  const grad = g.createLinearGradient(0, 0, 0, c.height);
-  grad.addColorStop(0.00, '#fffaea');
-  grad.addColorStop(0.34, '#ffe9a6');
-  grad.addColorStop(0.62, '#ffc94a');
-  grad.addColorStop(0.86, '#ff8a24');
-  grad.addColorStop(1.00, '#f7671c');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, c.width, c.height);
-
-  // Horizontal magenta/purple stripes through the lower half of the glyphs.
-  const bands = [
-    [0.56, 0.075, 'rgba(255, 34, 148, 0.92)'],
-    [0.655, 0.052, 'rgba(168, 42, 222, 0.86)'],
-    [0.725, 0.070, 'rgba(255, 68, 160, 0.90)'],
-    [0.815, 0.048, 'rgba(140, 34, 210, 0.84)'],
-    [0.878, 0.062, 'rgba(255, 90, 130, 0.88)'],
-  ];
-  for (const [y, hh, colour] of bands) {
-    g.fillStyle = colour;
-    g.fillRect(0, c.height * y, c.width, Math.max(1, c.height * hh));
+function stripedChromeFill(ctx, top, height) {
+  const grad = ctx.createLinearGradient(0, top, 0, top + height);
+  const edges = new Set([0, 1]);
+  for (const [t] of CHROME_BASE) edges.add(t);
+  for (const [y, hh] of CHROME_BANDS) { edges.add(y); edges.add(y + hh); }
+  edges.add(CHROME_SPEC[0]);
+  edges.add(CHROME_SPEC[0] + CHROME_SPEC[1]);
+  const stops = [...edges].sort((a, b) => a - b);
+  for (const t of stops) {
+    const rgb = chromeColorAt(t);
+    const css = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+    grad.addColorStop(Math.max(0, t - 1e-6), css);
+    grad.addColorStop(t, css);
+    grad.addColorStop(Math.min(1, t + 1e-6), css);
   }
-  // A specular line across the upper third, the way chrome catches the sun.
-  g.fillStyle = 'rgba(255,255,255,0.55)';
-  g.fillRect(0, c.height * 0.235, c.width, Math.max(1, c.height * 0.022));
-  return ctx.createPattern(c, 'no-repeat');
+  return grad;
 }
 
 /** A four-point sparkle, cream with a dark keyline. */
@@ -562,10 +617,25 @@ function drawMasthead(ctx, state, plan, palette, size) {
   ctx.font = `${fsize}px ${TITLE_FACE}`;
   ctx.letterSpacing = `${fsize * tracking}px`;
 
-  const pattern = stripedChromePattern(ctx, blockW, textH);
+  // Anton's caps are far shorter than its line box, so anchor the chrome ramp
+  // to the measured glyph ink box rather than to the line box.
+  let inkTop = Infinity;
+  let inkBottom = -Infinity;
+  lines.forEach((line, i) => {
+    const yy = (i - (lines.length - 1) / 2) * lineH;
+    const m2 = ctx.measureText(line);
+    inkTop = Math.min(inkTop, yy - (m2.actualBoundingBoxAscent || fsize * 0.72));
+    inkBottom = Math.max(inkBottom, yy + (m2.actualBoundingBoxDescent || 0));
+  });
+  if (inkBottom - inkTop < 1) {
+    inkTop = -textH / 2;
+    inkBottom = textH / 2;
+  }
+  const inkH = inkBottom - inkTop;
+
   const style = state.titleStyle ?? 'chrome';
   const buildFill = () => {
-    if (style === 'chrome') return pattern;
+    if (style === 'chrome') return stripedChromeFill(ctx, inkTop, inkH);
     if (style === 'white') return palette.paper;
     const g = ctx.createLinearGradient(0, -textH / 2, 0, textH / 2);
     g.addColorStop(0, '#fff3cf');
