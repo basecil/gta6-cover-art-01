@@ -1,72 +1,75 @@
-// Wires the Midnight Vice editor: one state object, a redraw, an undo stack,
-// per-panel drag/zoom/crop, presets, presets and PNG export. Rendering lives in
+// Wires the Sunflare editor: one state object, a redraw, an undo stack,
+// per-panel drag/zoom/crop, presets and PNG export. Rendering lives in
 // render.js; every panel keeps its own photo, zoom and offset.
 import { drawCover, renderToCanvas, planFrame, EXPORT_SIZES, splitTitle, __debug, ROLE_TAGS } from './render.js';
-import { LAYOUTS, layoutPanels, panelGap, layoutById } from './layouts.js';
-import { GRADES, gradeById } from './grades.js';
+import { LAYOUTS, layoutPanels, panelGap, layoutById, DEFAULT_LAYOUT } from './layouts.js';
+import { GRADES, gradeById, DEFAULT_GRADE } from './grades.js';
 import { runShot } from './shots.js';
 import { SAMPLES } from './samples.js';
 
-const SAMPLE_FILES = SAMPLES.map((s) => s.file);
 const SHUFFLE_TITLES = [
-  'Midnight Vice', 'Neon Alibi', 'After Dark', 'Vice Meridian', 'Night Ledger',
-  'Last Neon', 'Chrome Tide', 'Palm Static', 'Harbor Lights', 'Heat Wave',
-  'Leonida Nights', 'Salt & Chrome', 'Coral Rush', 'Afterglow Ave', 'Dusk Patrol',
+  'Sunflare', 'Palm Fever', 'Golden Season', 'Coral Alibi', 'Heatwave',
+  'Sunset Strip', 'Leonida Gold', 'High Tide', 'Salt & Sun', 'Coral Rush',
+  'Afterglow Ave', 'Sun Chaser', 'Dusk Patrol', 'Golden Coast', 'Crystal Heat',
 ];
 const SHUFFLE_SUBS = [
-  'Leonida after dark', 'every night is a movie', 'no sleep on the coast',
-  'chrome and salt air', 'the city never cools', 'lights out, lights on',
+  'Leonida in golden light', 'one last summer', 'the coast is calling',
+  'sun up, top down', 'every hour is golden', 'no shade on the coast',
+  'the heat never left', 'last light on the boulevard',
 ];
 const PRESETS = [
   {
-    id: 'vice-standard',
-    name: 'Vice Standard',
+    id: 'golden-standard',
+    name: 'Golden Standard',
     state: {
-      layout: 'hero', grade: 'vice', titleStyle: 'chrome', stars: 5,
-      title: 'Midnight Vice', subtitle: 'Leonida after dark', footer: 'Midnight Vice Studio presents',
-      badge: 'LEONIDA • EST. 2026', halftone: true, grain: true, vignette: true,
-      skyGlow: true, posterInk: true, compare: false,
+      layout: 'mosaic', grade: 'golden', titleStyle: 'chrome', stars: 5,
+      title: 'Sunflare', subtitle: 'Leonida in golden light', footer: 'Sunflare Pictures presents',
+      badge: 'LEONIDA • EST. 2026', halftone: false, grain: true, vignette: true,
+      skyGlow: true, posterInk: true, compare: false, popout: true,
     },
   },
   {
-    id: 'midnight-run',
-    name: 'Midnight Run',
+    id: 'coral-summer',
+    name: 'Coral Summer',
     state: {
-      layout: 'hero3', grade: 'midnight', titleStyle: 'white', stars: 4,
-      title: 'Night Shift', subtitle: 'after dark, everything glows', footer: 'A Midnight Vice picture',
-      badge: 'LEONIDA • EST. 2026', halftone: true, grain: true, vignette: true,
-      skyGlow: true, posterInk: true, compare: false,
+      layout: 'hero3', grade: 'coral', titleStyle: 'chrome', stars: 4,
+      title: 'Coral Season', subtitle: 'one last summer', footer: 'A Sunflare picture',
+      badge: 'LEONIDA • EST. 2026', halftone: false, grain: true, vignette: true,
+      skyGlow: true, posterInk: true, compare: false, popout: true,
     },
   },
   {
-    id: 'afterdark-noir',
-    name: 'Afterdark Noir',
+    id: 'sunset-strip',
+    name: 'Sunset Strip',
     state: {
-      layout: 'slash', grade: 'afterdark', titleStyle: 'sunset', stars: 4,
-      title: 'Palm Static', subtitle: 'lights out, lights on', footer: 'Midnight Vice Studio presents',
-      badge: 'LEONIDA • EST. 2026', halftone: true, grain: true, vignette: true,
-      skyGlow: false, posterInk: true, compare: false,
+      layout: 'seven', grade: 'strip', titleStyle: 'sunset', stars: 4,
+      title: 'Sunset Strip', subtitle: 'the heat never left', footer: 'Sunflare Pictures presents',
+      badge: 'LEONIDA • EST. 2026', halftone: false, grain: true, vignette: true,
+      skyGlow: true, posterInk: true, compare: false, popout: true,
     },
   },
 ];
 
 const state = {
-  layout: 'hero',
-  grade: 'midnight',
-  title: 'Midnight Vice',
-  subtitle: 'Leonida after dark',
-  footer: 'Midnight Vice Studio presents',
+  layout: DEFAULT_LAYOUT,
+  grade: DEFAULT_GRADE,
+  title: 'Sunflare',
+  subtitle: 'Leonida in golden light',
+  footer: 'Sunflare Pictures presents',
   badge: 'LEONIDA • EST. 2026',
+  quote: '“A sun-soaked knockout — the cover of the summer.”',
   stars: 5,
   titleStyle: 'chrome',
-  halftone: true,
+  halftone: false,
   grain: true,
   vignette: true,
   skyGlow: true,
   posterInk: true,
   compare: false,
   roleTags: true,
-  roles: ['LUCIA', 'NEON ALLEY', 'OCEAN DRIVE', 'THE CITY', 'SIGN DISTRICT', 'THE GETAWAY', 'PALM NIGHTS', 'THE COAST', 'LAST EXIT'],
+  popout: true,
+  kit: { seal: true, barcode: true, billing: true, quote: true, vol: true, comingSoon: true },
+  roles: ['THE LEAD', 'THE COAST', 'THE GETAWAY', 'THE PIER', 'POOLSIDE', 'THE CREW', 'THE CITY', 'THE TOWER', 'THE CREW'],
   preview: 'landscape',
   selected: 0,
   slots: [],
@@ -95,8 +98,8 @@ function slotCount(layoutId) {
 }
 
 function ensureSlots() {
-  const n = Math.max(slotCount(state.layout), state.photos.length, 1);
-  while (state.slots.length < n) state.slots.push({ photo: null, zoom: 1, ox: 0, oy: 0 });
+  const n = Math.max(slotCount(state.layout), 1);
+  while (state.slots.length < n) state.slots.push({ photo: null, zoom: 1, ox: 0, oy: 0, focus: null });
 }
 
 function addImage(img, name, file, face, role = null) {
@@ -181,10 +184,10 @@ function queueRedraw(message = null) {
 function snapshot() {
   return JSON.stringify({
     layout: state.layout, grade: state.grade, title: state.title, subtitle: state.subtitle,
-    footer: state.footer, badge: state.badge, stars: state.stars, titleStyle: state.titleStyle,
-    halftone: state.halftone, grain: state.grain, vignette: state.vignette,
-    skyGlow: state.skyGlow, posterInk: state.posterInk, compare: state.compare,
-    roleTags: state.roleTags,
+    footer: state.footer, badge: state.badge, quote: state.quote, stars: state.stars,
+    titleStyle: state.titleStyle, halftone: state.halftone, grain: state.grain,
+    vignette: state.vignette, skyGlow: state.skyGlow, posterInk: state.posterInk,
+    compare: state.compare, roleTags: state.roleTags, popout: state.popout, kit: state.kit,
     photos: state.photos.map((p) => ({ id: p.id, name: p.name, file: p.file, face: p.face, role: p.role ?? null, url: p.url })),
     slots: state.slots.map((s) => ({ photo: s.photo, zoom: s.zoom, ox: s.ox, oy: s.oy, focus: s.focus ?? null })),
   });
@@ -194,6 +197,7 @@ function restore(text) {
   const s = JSON.parse(text);
   Object.assign(state, s);
   state.photos = s.photos ?? state.photos;
+  state.kit = s.kit ?? state.kit;
   ensureSlots();
   syncControls();
   queueRedraw();
@@ -251,24 +255,12 @@ function panelRects() {
   return layoutPanels(state.layout, frame.panels, panelGap(w, h));
 }
 
-function localPoint(rect, x, y) {
-  if (!rect.rotate) return { x, y };
-  const cx = rect.x + rect.w / 2;
-  const cy = rect.y + rect.h / 2;
-  const cos = Math.cos(-rect.rotate);
-  const sin = Math.sin(-rect.rotate);
-  const dx = x - cx;
-  const dy = y - cy;
-  return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
-}
-
 function panelAt(x, y) {
   const rects = panelRects();
   for (let i = rects.length - 1; i >= 0; i--) {
     const r = rects[i];
     if (r.kind === 'caption') continue;
-    const p = localPoint(r, x, y);
-    if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return { index: i, rect: r };
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return { index: i, rect: r };
   }
   return null;
 }
@@ -292,7 +284,7 @@ function download(canvasEl, size) {
       }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `midnight-vice-${size.file}.png`;
+      a.download = `sunflare-${size.file}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -306,7 +298,7 @@ async function exportSize(size) {
   status(`Rendering ${size.file}…`);
   const rendered = renderToCanvas(state, images, size.w, size.h);
   const ok = await download(rendered, size);
-  status(ok ? `Saved midnight-vice-${size.file}.png` : 'Export failed');
+  status(ok ? `Saved sunflare-${size.file}.png` : 'Export failed');
   return ok;
 }
 
@@ -336,11 +328,16 @@ function buildLayoutPicker() {
     const tag = document.createElement('span');
     tag.className = 'tag';
     tag.textContent = layout.name
+      .replace('Hero Mosaic', 'Mosaic')
+      .replace('Hero + Three', 'Hero+3')
+      .replace('Six Grid', '6-up')
+      .replace('Diagonal Trio', 'Trio')
+      .replace('Seven Mosaic', '7-up')
       .replace('Full-Bleed Hero', 'Hero')
-      .replace('Nine-Panel', '9-up')
-      .replace('Four-Panel', '4-up')
+      .replace('Slashed Comic', 'Slash')
       .replace('Whole Cast', 'Cast')
-      .replace('Slashed Comic', 'Slash');
+      .replace('Slanted Panels', 'Slant')
+      .replace('Triptych Strip', 'Strip');
     btn.appendChild(tag);
     grid.appendChild(btn);
     drawLayoutMini(mini, layout.id);
@@ -356,19 +353,13 @@ function drawLayoutMini(mini, id) {
   const W = mini.width;
   const H = mini.height;
   g.clearRect(0, 0, W, H);
-  g.fillStyle = '#0d0a16';
+  g.fillStyle = '#1b0c08';
   g.fillRect(0, 0, W, H);
-  const area = { x: 6, y: 20, w: W - 12, h: H - 26 };
-  const rects = layoutPanels(id, area, 2.6);
+  const area = { x: 6, y: 16, w: W - 12, h: H - 20 };
+  const rects = layoutPanels(id, area, 2.4);
   rects.forEach((r, i) => {
-    g.save();
-    if (r.rotate) {
-      g.translate(r.x + r.w / 2, r.y + r.h / 2);
-      g.rotate(r.rotate);
-      g.translate(-(r.x + r.w / 2), -(r.y + r.h / 2));
-    }
-    const shade = 26 + ((i * 23) % 40);
-    g.fillStyle = r.kind === 'caption' ? '#2b2340' : `rgb(${shade + 14}, ${shade}, ${shade + 30})`;
+    const shade = 22 + ((i * 29) % 46);
+    g.fillStyle = `rgb(${shade + 30}, ${shade + 10}, ${shade})`;
     if (r.skew) {
       g.beginPath();
       g.moveTo(r.x + r.skew, r.y);
@@ -377,19 +368,18 @@ function drawLayoutMini(mini, id) {
       g.lineTo(r.x, r.y + r.h);
       g.closePath();
       g.fill();
-      g.strokeStyle = '#c9b8e8';
-      g.lineWidth = 1;
+      g.strokeStyle = r.hero ? '#ffe0a0' : '#c8a878';
+      g.lineWidth = r.hero ? 1.6 : 1;
       g.stroke();
     } else {
       g.fillRect(r.x, r.y, r.w, r.h);
-      g.strokeStyle = '#c9b8e8';
-      g.lineWidth = 1;
+      g.strokeStyle = r.hero ? '#ffe0a0' : '#c8a878';
+      g.lineWidth = r.hero ? 1.6 : 1;
       g.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
     }
-    g.restore();
   });
-  g.fillStyle = '#f6ead4';
-  g.fillRect(6, 7, (W - 12) * 0.55, 7);
+  g.fillStyle = '#ffb45e';
+  g.fillRect(6, 4, (W - 12) * 0.55, 6);
 }
 
 function buildGradePicker() {
@@ -507,7 +497,7 @@ function buildPanelThumbs() {
       img.alt = `Panel ${i + 1}`;
       b.appendChild(img);
     } else {
-      b.style.background = 'repeating-linear-gradient(45deg, #1b1529 0 6px, #141020 6px 12px)';
+      b.style.background = 'repeating-linear-gradient(45deg, #2a160c 0 6px, #20110a 6px 12px)';
     }
     const n2 = document.createElement('span');
     n2.className = 'n';
@@ -536,6 +526,7 @@ function syncControls() {
   $('subtitle').value = state.subtitle;
   $('footer').value = state.footer;
   $('badge').value = state.badge;
+  $('quote').value = state.quote;
   $('halftone').checked = state.halftone !== false;
   $('grain').checked = state.grain !== false;
   $('vignette').checked = state.vignette !== false;
@@ -543,6 +534,11 @@ function syncControls() {
   $('roleTags').checked = state.roleTags !== false;
   $('posterInk').checked = state.posterInk !== false;
   $('compare').checked = Boolean(state.compare);
+  $('popout').checked = Boolean(state.popout);
+  for (const [key, id] of [['seal', 'kitSeal'], ['barcode', 'kitBarcode'], ['billing', 'kitBilling'], ['quote', 'kitQuote'], ['vol', 'kitVol'], ['comingSoon', 'kitComingSoon']]) {
+    const el = $(id);
+    if (el) el.checked = Boolean(state.kit?.[key]);
+  }
   $('layoutName').textContent = layoutById(state.layout).name;
   $('photoCount').textContent = `${state.photos.length} / 9`;
   $('panelName').textContent = `Panel ${state.selected + 1}`;
@@ -595,12 +591,23 @@ function bind() {
   bindText('subtitle', 'subtitle', 'Subtitle updated');
   bindText('footer', 'footer', 'Footer updated');
   bindText('badge', 'badge', 'Ribbon updated');
+  bindText('quote', 'quote', 'Press quote updated');
 
-  for (const id of ['halftone', 'roleTags', 'grain', 'vignette', 'skyGlow', 'posterInk']) {
+  for (const id of ['halftone', 'roleTags', 'grain', 'vignette', 'skyGlow', 'posterInk', 'popout']) {
     $(id).addEventListener('change', (e) => {
       state[id] = e.target.checked;
       queueRedraw();
       commit(`${id} ${e.target.checked ? 'on' : 'off'}`);
+    });
+  }
+  for (const [key, id] of [['seal', 'kitSeal'], ['barcode', 'kitBarcode'], ['billing', 'kitBilling'], ['quote', 'kitQuote'], ['vol', 'kitVol'], ['comingSoon', 'kitComingSoon']]) {
+    const el = $(id);
+    if (!el) continue;
+    el.addEventListener('change', () => {
+      state.kit = { ...state.kit, [key]: el.checked };
+      syncControls();
+      queueRedraw();
+      commit(`Retail ${key} ${el.checked ? 'on' : 'off'}`);
     });
   }
   $('compare').addEventListener('change', (e) => {
@@ -767,9 +774,8 @@ function bind() {
 
 async function addSample() {
   const free = state.slots.findIndex((s) => !s.photo);
-  const photo = state.photos.length % Math.max(1, state.photos.length || 1);
-  // Cycle through the shipped samples so each press adds a new night scene.
-  const next = SAMPLES[photo % SAMPLES.length];
+  // Cycle through the shipped samples so each press adds a new sunlit scene.
+  const next = SAMPLES[state.photos.length % SAMPLES.length];
   if (!state.photos.some((p) => p.file === next.file)) {
     try {
       const img = await loadImage(`./assets/${next.file}`);
@@ -875,13 +881,53 @@ function bindCanvas() {
     const hit = panelAt(p.x, p.y);
     const file = e.dataTransfer.files[0];
     const id = await addFile(file);
-    wrap.classList.remove('dropping');
     if (!id) return;
     assign(id, hit ? hit.index : state.selected);
     syncControls();
     queueRedraw();
     commit('Photo dropped in');
   });
+}
+
+/* -------------------------------------------------------------------- seed */
+
+/**
+ * Fills every panel with its own sample photo and its own crop. The hero panel
+ * always gets the sunlit face (framed on its face box, so the pop-out and every
+ * cover size keep the head whole); the rest rotate through the remaining
+ * samples. Crops are taken from a table, one entry per panel, so no two panels
+ * ever share a crop -- the round-3 identical-crop bug cannot recur.
+ */
+const SEED_ORDER = ['hero', 'beach', 'car', 'pool', 'tower', 'scooter', 'pier', 'skyline'];
+const SEED_CROPS = [
+  [1.04, 0.00, 0.00],
+  [1.16, -0.30, 0.22],
+  [1.08, 0.26, -0.24],
+  [1.24, 0.14, 0.30],
+  [1.03, -0.12, -0.28],
+  [1.14, 0.32, 0.12],
+  [1.11, -0.24, -0.16],
+  [1.21, 0.06, 0.26],
+];
+
+function seedComposition() {
+  ensureSlots();
+  const n = slotCount(state.layout);
+  const base = (v) => String(v || '').replace(/\.[^.]+$/, '').toLowerCase();
+  const byFile = (f) => state.photos.find((p) => base(p.file) === base(f) || base(p.name) === base(f))?.id ?? state.photos[0]?.id ?? null;
+  for (let i = 0; i < n; i++) {
+    const [zoom, ox, oy] = SEED_CROPS[i % SEED_CROPS.length];
+    const file = SEED_ORDER[i % SEED_ORDER.length];
+    const id = byFile(file);
+    const photo = state.photos.find((p) => p.id === id);
+    state.slots[i] = {
+      photo: id,
+      zoom,
+      ox,
+      oy,
+      focus: i === 0 && photo?.face ? photo.face : null,
+    };
+  }
 }
 
 /* ------------------------------------------------------------------- boot */
@@ -903,36 +949,19 @@ async function boot() {
   ensureSlots();
 
   await loadSamples();
-
-  // Seed the opening composition: the full-bleed hero first (the app OPENS on
-  // the hero layout with the face framed), then each remaining panel gets its
-  // OWN photo and its OWN crop, never a shared one.
-  const byName = (n) => state.photos.find((p) => p.name === n)?.id ?? null;
-  const seed = ['hero', 'glow', 'street', 'neon', 'car', 'palm', 'beach', 'skyline', 'motel'];
-  const crops = [
-    [1.04, 0.00, 0.00, 'face'], [1.14, -0.30, 0.22], [1.06, 0.26, -0.24],
-    [1.22, 0.14, 0.28], [1.02, -0.12, -0.30], [1.10, 0.32, 0.10],
-    [1.08, -0.24, -0.16], [1.18, 0.06, 0.26], [1.00, -0.04, 0.02],
-  ];
-  const n = slotCount(state.layout);
-  for (let i = 0; i < n; i++) {
-    const [zoom, ox, oy, focus] = crops[i % crops.length];
-    const id = byName(seed[i % seed.length]);
-    const photo = state.photos.find((p) => p.id === id);
-    state.slots[i] = {
-      photo: id, zoom, ox, oy,
-      focus: focus === 'face' && photo?.face ? photo.face : null,
-    };
-  }
+  seedComposition();
 
   syncControls();
   queueRedraw();
-  window.__studio = { state, images, EXPORT_SIZES, splitTitle, __debug, drawCover, planFrame, renderToCanvas, ROLE_TAGS, syncControls, queueRedraw, setLayout };
+  window.__studio = {
+    state, images, EXPORT_SIZES, splitTitle, __debug, drawCover, planFrame,
+    renderToCanvas, ROLE_TAGS, syncControls, queueRedraw, setLayout, seedComposition,
+  };
 
   const query = new URLSearchParams(location.search);
   const shot = query.get('shot');
   if (shot) {
-    await runShot(shot, query, { state, images, restore, syncControls, queueRedraw, setLayout, commit });
+    await runShot(shot, query, { state, images, restore, syncControls, queueRedraw, setLayout, commit, seedComposition });
     requestAnimationFrame(() => requestAnimationFrame(() => { window.__shotReady = true; }));
     return;
   }

@@ -3,14 +3,17 @@
 // request), and the program hands it in. It copies app/ and screenshots/ from beside this file to /output and writes
 // /output/dossier.json, the summary the judge reads, with the vendored make.fun library.
 //
-// Description: Midnight Vice is a night-first GTA-style cover studio that opens on a single
-// full-bleed hero poster -- one night photo edge to edge with the title over the art -- and
-// then lets you build a nine-panel grid, a slashed comic, slanted prints or any of ten layouts.
-// Eight gradient-map grades (all skin-safe), chrome 3D / white / neon lettering, a sky-glow and
-// poster-ink finish, a before/after view, per-panel crops with drag and zoom, role tags, a heat
-// meter, undo/redo, and PNG export at 1080x1080, 1080x1350, 1920x1080 and 1080x1920. It ships
-// eight CC-licensed night sample photos under app/assets/ (attribution in README.md) and makes
-// zero network requests at runtime.
+// Description: Sunflare is a golden-hour GTA-style cover studio that opens on a hero-mosaic
+// poster -- five slanted panels with one dominant sunlit face, the striped-chrome title over the
+// art and the hero cut out in front of it -- and then lets you build hero-and-three, six grid,
+// diagonal trio, seven mosaic, full-bleed hero, slashed comic, whole cast, slanted panels or a
+// triptych strip. Eight sun-tuned gradient-map grades (Golden Hour default, all skin-safe),
+// striped-chrome 3D / cream / sunset lettering, a hot-pink script subtitle, a full retail kit
+// (gold seal, barcode, billing block, five-star press quote, VOL. 1 tab, COMING SOON), a
+// pop-out hero, sky glow, poster ink, before/after, per-panel crops with drag and zoom, role
+// tags, a heat meter, undo/redo, and PNG export at 1080x1080, 1080x1350, 1920x1080 and
+// 1080x1920. It ships eight CC-licensed golden-hour sample photos under app/assets/
+// (attribution in README.md) and makes zero network requests at runtime.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:

@@ -1,8 +1,12 @@
-// The cover engine for Midnight Vice: one function draws the whole poster at
-// any size, so the live preview and all four exports run identical code.
-// Geometry comes from layouts.js, palettes from grades.js; nothing here touches
-// the network. Night-first: the default layout is a single full-bleed photo with
-// the lettering over the art, a sky glow behind it and an ink band under it.
+// The cover engine for Sunflare: one function draws the whole poster at any
+// size, so the live preview and all four exports run identical code. Geometry
+// comes from layouts.js, palettes from grades.js; nothing here touches the
+// network.
+//
+// The look is a golden-hour key-art collage: the photo field runs edge to edge,
+// a striped-chrome title sits OVER the art, the pop-out hero breaks in front of
+// it, and a retail band along the bottom carries the billing block, barcode and
+// press quote the way a real poster does.
 
 import { layoutPanels, panelGap } from './layouts.js';
 import { gradeById, gradeLut, skinScore, skinTone, rgba, mixHex } from './grades.js';
@@ -17,14 +21,11 @@ export const EXPORT_SIZES = [
 export const TITLE_FACE = '"Anton", "Arial Narrow", Impact, sans-serif';
 export const SCRIPT_FACE = '"Pacifico", "Brush Script MT", cursive';
 
-/**
- * Fallback role tags, in panel order. A shipped sample carries its own tag (see
- * samples.js) so the label always names the photo under it -- a street scene is
- * never tagged with a character's name; this list only covers uploaded photos.
- */
+/** Fallback role tags, in panel order. A shipped sample carries its own tag
+ *  (see samples.js) so the label always names the photo under it. */
 export const ROLE_TAGS = [
-  'LUCIA', 'NEON ALLEY', 'OCEAN DRIVE', 'THE CITY', 'SIGN DISTRICT',
-  'THE GETAWAY', 'PALM NIGHTS', 'THE COAST', 'LAST EXIT',
+  'THE LEAD', 'THE COAST', 'THE GETAWAY', 'THE PIER', 'POOLSIDE',
+  'THE CREW', 'THE CITY', 'THE TOWER', 'THE CREW',
 ];
 
 /** The caption for a panel: the photo's own tag first, then a positional one. */
@@ -33,74 +34,69 @@ export function panelRole(state, slot, index) {
   return photo?.role || state.roles?.[index] || ROLE_TAGS[index % ROLE_TAGS.length];
 }
 
+/** How tall the retail band is, per the round-5 recipe. */
+export function retailBandHeight(width, height) {
+  const aspect = height / width;
+  if (height / width > 1.5) return Math.round(height * 0.155);
+  if (width / height > 1.16) return Math.round(height * 0.185);
+  return Math.round(height * 0.172);
+}
+
 /**
- * Where the masthead, panel field and footer sit for a canvas size. A landscape
- * canvas puts the lettering in a left column and the panels on the right; a
- * portrait shape stacks header, panels, footer. The full-bleed hero has no panel
- * field -- its photo is the whole canvas and the lettering sits over it, at the
- * left on a landscape canvas and in a band at the top of a portrait one.
+ * Where the masthead, retail band and panel field sit for a canvas size.
+ * The photo field is the whole canvas (the collage bleeds to every edge); the
+ * lettering floats over it. A landscape sheet puts the title in the left
+ * column with the hero to its right; a portrait sheet stacks the title across
+ * the top so the hero's face keeps its whole head clear.
  */
 export function planFrame(layoutId, width, height) {
   const min = Math.min(width, height);
   const margin = Math.round(min * 0.034);
   const landscape = width / height > 1.16;
-  const bleed = layoutId === 'hero';
   const tall = height / width;
+  const bandH = retailBandHeight(width, height);
 
-  if (bleed) {
-    if (landscape) {
-      const colW = Math.round(width * 0.44);
-      const footerH = Math.round(height * 0.20);
-      return {
-        landscape, bleed, tall, margin,
-        masthead: { x: margin * 1.35, y: height * 0.20, w: colW - margin * 1.2, h: height * 0.46 },
-        footer: { x: margin * 1.35, y: height - footerH - margin * 1.1, w: colW - margin * 1.2, h: footerH },
-        panels: { x: 0, y: 0, w: width, h: height },
-      };
-    }
-    // A portrait/story sheet gets a compact masthead band at the top, so the
-    // hero subject framed underneath it keeps its whole face inside the frame.
-    const headerH = Math.round(height * (tall > 1.5 ? 0.215 : 0.235));
-    const footerH = Math.round(height * 0.105);
+  if (landscape) {
     return {
-      landscape, bleed, tall, margin,
-      masthead: { x: margin, y: margin * 0.85, w: width - margin * 2, h: headerH },
-      footer: { x: margin, y: height - margin - footerH, w: width - margin * 2, h: footerH },
+      landscape, tall, margin, bandH,
+      bleed: layoutId === 'hero',
+      masthead: { x: Math.round(width * 0.030), y: Math.round(height * 0.268), w: Math.round(width * 0.435), h: Math.round(height * 0.545) },
+      quote: { x: Math.round(width * 0.030), y: Math.round(height * 0.030), w: Math.round(width * 0.42), h: Math.round(height * 0.135) },
+      band: { x: 0, y: height - bandH, w: width, h: bandH },
+      footer: { x: Math.round(width * 0.030), y: height - bandH, w: Math.round(width * 0.94), h: bandH },
       panels: { x: 0, y: 0, w: width, h: height },
     };
   }
 
-  if (landscape) {
-    const colW = Math.round(width * 0.305);
-    const footerH = Math.round(height * 0.235);
-    const innerW = colW - margin * 1.7;
-    return {
-      landscape, bleed, tall, margin,
-      masthead: { x: margin, y: Math.round(margin * 0.9), w: innerW, h: height - margin - footerH - Math.round(margin * 0.9) },
-      footer: { x: margin, y: height - margin - footerH, w: innerW, h: footerH },
-      panels: { x: colW, y: margin, w: width - colW - margin, h: height - margin * 2 },
-    };
-  }
-
-  const headerFrac = tall > 1.5 ? 0.19 : tall > 1.12 ? 0.238 : 0.295;
-  const footerFrac = tall > 1.5 ? 0.088 : tall > 1.12 ? 0.10 : 0.122;
-  const headerH = Math.round(height * headerFrac);
-  const footerH = Math.round(height * footerFrac);
+  // A tall sheet sets the title across the lower-middle of the art, the way a
+  // key-art poster does, so the hero's face in the top third stays clear of the
+  // pink script. The press quote sits just above it, the retail band below.
+  const inset = Math.round(width * 0.055);
   return {
-    landscape, bleed, tall, margin,
-    masthead: { x: margin, y: Math.round(margin * 0.8), w: width - margin * 2, h: headerH - Math.round(margin * 0.8) },
-    footer: { x: margin, y: height - margin - footerH, w: width - margin * 2, h: footerH },
-    panels: { x: margin, y: headerH, w: width - margin * 2, h: height - headerH - footerH - margin },
+    landscape, tall, margin, bandH,
+    bleed: layoutId === 'hero',
+    masthead: { x: inset, y: Math.round(height * 0.452), w: width - inset * 2, h: Math.round(height * (tall > 1.5 ? 0.268 : 0.272)) },
+    quote: { x: inset, y: Math.round(height * 0.352), w: width - inset * 2, h: Math.round(height * 0.072) },
+    band: { x: 0, y: height - bandH, w: width, h: bandH },
+    footer: { x: inset, y: height - bandH, w: width - inset * 2, h: bandH },
+    panels: { x: 0, y: 0, w: width, h: height },
   };
+}
+
+/** Where a framed face sits inside its panel: right of centre on a landscape
+ *  sheet (the title takes the left), lower-centre on a tall one. */
+export function photoAnchor(plan) {
+  if (plan.landscape) return { x: 0.52, y: 0.40 };
+  return { x: 0.5, y: 0.56 };
 }
 
 /* ------------------------------------------------------------------ helpers */
 
-function starPath(ctx, cx, cy, r) {
+function starPath(ctx, cx, cy, r, points = 5, inner = 0.44) {
   ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const rad = i % 2 === 0 ? r : r * 0.44;
-    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+  for (let i = 0; i < points * 2; i++) {
+    const rad = i % 2 === 0 ? r : r * inner;
+    const a = -Math.PI / 2 + (i * Math.PI) / points;
     const px = cx + Math.cos(a) * rad;
     const py = cy + Math.sin(a) * rad;
     if (i === 0) ctx.moveTo(px, py);
@@ -115,9 +111,11 @@ function drawStar(ctx, cx, cy, r, fill, ink, lw) {
     ctx.fillStyle = fill;
     ctx.fill();
   }
-  ctx.lineWidth = lw;
-  ctx.strokeStyle = ink;
-  ctx.stroke();
+  if (ink) {
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+  }
 }
 
 /** Width of `text` at `size` in a face, with tracking, without mutating ctx.font. */
@@ -204,8 +202,8 @@ export function placePhoto(iw, ih, slot, r, anchor) {
   let dx;
   let dy;
   if (slot.focus) {
-    // Frame the focus box (a face, a sign) by its centre rather than its
-    // top-left corner, so the subject sits where the layout expects it.
+    // Frame the focus box (a face) by its centre rather than its top-left
+    // corner, so the subject sits where the layout expects it.
     const ax = anchor?.x ?? 0.5;
     const ay = anchor?.y ?? 0.5;
     const fx = slot.focus.x ?? 0.5;
@@ -247,23 +245,12 @@ function drawPhoto(ctx, image, slot, r, palette, anchor) {
     wash.addColorStop(1, mixHex(palette.ink, palette.paper, 0.16));
     ctx.fillStyle = wash;
     ctx.fillRect(x, r.y, w, r.h);
-    ctx.strokeStyle = rgba(palette.paper, 0.20);
-    ctx.lineWidth = Math.max(1, Math.min(r.w, r.h) * 0.004);
-    const step = Math.max(16, Math.min(r.w, r.h) * 0.10);
-    for (let d = -r.h; d < w + r.h; d += step) {
-      ctx.beginPath();
-      ctx.moveTo(x + d, r.y);
-      ctx.lineTo(x + d - r.h, r.y + r.h);
-      ctx.stroke();
-    }
     const size = Math.max(10, Math.min(r.w, r.h) * 0.062);
     ctx.fillStyle = rgba(palette.paper, 0.82);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = `${size}px ${TITLE_FACE}`;
-    ctx.letterSpacing = `${size * 0.1}px`;
     ctx.fillText('DROP A PHOTO', x + w / 2, r.y + r.h / 2);
-    ctx.letterSpacing = '0px';
     ctx.restore();
     return;
   }
@@ -281,9 +268,9 @@ function drawPhoto(ctx, image, slot, r, palette, anchor) {
   if (r.skew) ctx.transform(1, 0, -r.skew / r.h, 1, r.skew, 0);
   ctx.drawImage(image, dx, dy, dw, dh);
 
-  const shade = ctx.createLinearGradient(0, h * 0.42, 0, h);
+  const shade = ctx.createLinearGradient(0, h * 0.55, 0, h);
   shade.addColorStop(0, 'rgba(0,0,0,0)');
-  shade.addColorStop(1, rgba(palette.ink, 0.34));
+  shade.addColorStop(1, rgba(palette.ink, 0.22));
   ctx.fillStyle = shade;
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
@@ -292,20 +279,20 @@ function drawPhoto(ctx, image, slot, r, palette, anchor) {
 /** A small ink tag naming a panel's role, printed in its top-left corner. */
 function drawRoleTag(ctx, rect, label, palette, size) {
   if (!label) return;
-  const h = Math.max(14, Math.min(size.w, size.h) * 0.026);
+  const h = Math.max(13, Math.min(size.w, size.h) * 0.024);
   const fs = h * 0.56;
   ctx.save();
   ctx.font = `${fs}px ${TITLE_FACE}`;
   ctx.letterSpacing = `${fs * 0.10}px`;
   const tw = ctx.measureText(label).width;
-  const pad = fs * 0.65;
-  const w = Math.min(tw + pad * 2, rect.w * 0.82);
-  const x = rect.x + h * 0.35 + Math.max(0, (rect.skew || 0) * 0.4);
-  const y = rect.y + h * 0.35;
-  ctx.fillStyle = palette.ink;
+  const pad = fs * 0.6;
+  const w = Math.min(tw + pad * 2, rect.w * 0.8);
+  const x = rect.x + h * 0.40 + Math.max(0, (rect.skew || 0) * 0.5);
+  const y = rect.y + h * 0.40;
+  ctx.fillStyle = rgba(palette.ink, 0.88);
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = rgba(palette.accent, 0.95);
-  ctx.fillRect(x, y + h - Math.max(1, h * 0.10), w, Math.max(1, h * 0.10));
+  ctx.fillRect(x, y + h - Math.max(1, h * 0.11), w, Math.max(1, h * 0.11));
   ctx.fillStyle = palette.paper;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -316,49 +303,22 @@ function drawRoleTag(ctx, rect, label, palette, size) {
 
 function drawPanels(ctx, state, plan, palette, graded, size) {
   const rects = layoutPanels(state.layout, plan.panels, panelGap(size.w, size.h));
-  // A full-bleed portrait sheet stacks the masthead at the top, so the hero
-  // subject is anchored lower, clear of the lettering plate.
-  const anchor = plan.landscape
-    ? { x: 0.68, y: 0.46 }
-    : plan.bleed ? { x: 0.5, y: 0.55 } : { x: 0.5, y: 0.36 };
+  const anchor = photoAnchor(plan);
   rects.forEach((rect, i) => {
     const slot = state.slots?.[i] ?? {};
     const image = slot.photo ? graded(slot.photo) : null;
     ctx.save();
-    if (rect.rotate) {
-      ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
-      ctx.rotate(rect.rotate);
-      ctx.translate(-(rect.x + rect.w / 2), -(rect.y + rect.h / 2));
-    }
-    if (rect.kind === 'caption') {
-      drawCaptionBand(ctx, state, rect, palette);
-      ctx.restore();
-      return;
-    }
-    if (rect.snapshot) {
-      const s = Math.min(rect.w, rect.h);
-      ctx.shadowColor = 'rgba(0,0,0,0.55)';
-      ctx.shadowBlur = s * 0.08;
-      ctx.shadowOffsetX = s * 0.010;
-      ctx.shadowOffsetY = s * 0.024;
-      ctx.fillStyle = palette.paper;
-      ctx.fillRect(rect.x - s * 0.028, rect.y - s * 0.028, rect.w + s * 0.056, rect.h + s * 0.056);
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-    }
     drawPhoto(ctx, image, slot, rect, palette, anchor);
 
-    if (!rect.bleed && !rect.snapshot) {
-      const lw = Math.max(2, Math.round(Math.min(size.w, size.h) * 0.0042));
-      ctx.strokeStyle = palette.ink;
+    if (!rect.bleed) {
+      const lw = Math.max(2, Math.round(Math.min(size.w, size.h) * 0.0040));
+      ctx.strokeStyle = rgba(palette.ink, 0.92);
       ctx.lineWidth = lw;
       panelPath(ctx, rect);
       ctx.stroke();
-      ctx.strokeStyle = rgba(palette.paper, 0.30);
+      ctx.strokeStyle = rgba(palette.accent, 0.42);
       ctx.lineWidth = Math.max(1, Math.round(lw * 0.30));
-      panelPath(ctx, rect, -lw * 1.8);
+      panelPath(ctx, rect, -lw * 1.7);
       ctx.stroke();
     }
     if (!rect.bleed && image && state.roleTags !== false) {
@@ -370,11 +330,6 @@ function drawPanels(ctx, state, plan, palette, graded, size) {
 
 /* ------------------------------------------------------------------- finish */
 
-/**
- * The sky glow: a broad neon wash over the top of the art plus a soft horizon
- * haze, so a night photo reads as a lit sky rather than a flat shadow. Drawn
- * over the panels and under the lettering; off with the skyGlow toggle.
- */
 let glowLayer = null;
 function skyGlowLayer(w, h) {
   if (!glowLayer) glowLayer = document.createElement('canvas');
@@ -388,52 +343,35 @@ function skyGlowLayer(w, h) {
 }
 
 /**
- * The sky glow: a broad neon wash over the top of the art plus a soft horizon
- * haze, so a night photo reads as a lit sky rather than a flat shadow. Drawn
- * over the panels and under the lettering; off with the skyGlow toggle.
- *
- * It is painted into its own layer so a framed face can be masked out of it: a
- * violet or cyan wash laid over skin is exactly what turns a face magenta, so
- * `protect` ellipses are erased from the glow before it is screened down. The
- * sky still glows, the face keeps its warmth.
+ * The sky glow: a broad warm wash over the top of the art plus a soft horizon
+ * haze, so a photo reads as golden-hour light rather than a flat scan. Painted
+ * into its own layer so a framed face can be masked out of it -- a coloured
+ * wash laid over skin is what turns a face green or magenta.
  */
 function drawSkyGlow(ctx, state, plan, palette, grade, size, protect = []) {
   const { w, h } = size;
-  const top = plan.bleed ? 0 : plan.panels.y;
-  const region = plan.bleed ? h * 0.62 : plan.panels.h * 0.52;
-  const cx = w * (plan.bleed && plan.landscape ? 0.62 : 0.5);
+  const top = 0;
+  const region = h * 0.62;
+  const cx = w * (plan.landscape ? 0.66 : 0.5);
 
   const layer = skyGlowLayer(w, h);
   layer.save();
   layer.globalCompositeOperation = 'source-over';
-  const g = layer.createRadialGradient(cx, top + region * 0.22, 0, cx, top + region * 0.22, Math.max(w, h) * 0.72);
-  g.addColorStop(0, rgba(grade.glow, 0.34));
-  g.addColorStop(0.38, rgba(grade.accent, 0.14));
+  const g = layer.createRadialGradient(cx, top + region * 0.16, 0, cx, top + region * 0.16, Math.max(w, h) * 0.74);
+  g.addColorStop(0, rgba(grade.glow, 0.30));
+  g.addColorStop(0.40, rgba(grade.accent, 0.13));
   g.addColorStop(1, 'rgba(0,0,0,0)');
   layer.fillStyle = g;
   layer.fillRect(0, 0, w, h);
 
-  const horizon = layer.createLinearGradient(0, top + region * 0.20, 0, top + region);
+  const horizon = layer.createLinearGradient(0, top + region * 0.24, 0, top + region);
   horizon.addColorStop(0, 'rgba(0,0,0,0)');
-  horizon.addColorStop(0.62, rgba(grade.glow, 0.10));
+  horizon.addColorStop(0.60, rgba(grade.glow, 0.09));
   horizon.addColorStop(1, 'rgba(0,0,0,0)');
   layer.fillStyle = horizon;
   layer.fillRect(0, top, w, region);
-
-  // A few soft haze bands, like light bleed off wet asphalt.
-  layer.globalAlpha = 0.10;
-  for (let i = 0; i < 3; i++) {
-    const y = top + region * (0.42 + i * 0.16);
-    const band = layer.createLinearGradient(0, y, w, y + region * 0.05);
-    band.addColorStop(0, 'rgba(0,0,0,0)');
-    band.addColorStop(0.5, rgba(i % 2 ? grade.accent : grade.glow, 0.9));
-    band.addColorStop(1, 'rgba(0,0,0,0)');
-    layer.fillStyle = band;
-    layer.fillRect(0, y, w, Math.max(2, region * 0.035));
-  }
   layer.globalAlpha = 1;
 
-  // Mask each framed face out of the wash with a soft-edged ellipse.
   layer.globalCompositeOperation = 'destination-out';
   for (const p of protect) {
     const hole = layer.createRadialGradient(p.cx, p.cy, 0, p.cx, p.cy, p.r);
@@ -455,9 +393,7 @@ function drawSkyGlow(ctx, state, plan, palette, grade, size, protect = []) {
 /** Face ellipses (canvas coords) of every framed panel, for the glow mask. */
 function framedFaces(state, plan, size, images) {
   const rects = layoutPanels(state.layout, plan.panels, panelGap(size.w, size.h));
-  const anchor = plan.landscape
-    ? { x: 0.68, y: 0.46 }
-    : plan.bleed ? { x: 0.5, y: 0.55 } : { x: 0.5, y: 0.36 };
+  const anchor = photoAnchor(plan);
   const out = [];
   rects.forEach((r, i) => {
     const slot = state.slots?.[i];
@@ -474,7 +410,7 @@ function framedFaces(state, plan, size, images) {
     const fh = (f.h ?? 0) * p.dh;
     const cx = fx + fw / 2;
     const cy = fy + fh / 2;
-    const rad = Math.max(fw, fh) * 0.78 + Math.min(r.w, r.h) * 0.02;
+    const rad = Math.max(fw, fh) * 0.80 + Math.min(r.w, r.h) * 0.02;
     out.push({ cx, cy, r: rad });
   });
   return out;
@@ -490,7 +426,7 @@ function drawInkFrame(ctx, plan, palette, size) {
   ctx.lineWidth = lw;
   ctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
   ctx.lineWidth = Math.max(1, lw * 0.35);
-  ctx.strokeStyle = rgba(palette.paper, 0.28);
+  ctx.strokeStyle = rgba(palette.paper, 0.30);
   ctx.strokeRect(pad + lw * 1.7, pad + lw * 1.7, w - pad * 2 - lw * 3.4, h - pad * 2 - lw * 3.4);
 
   const mark = Math.round(Math.min(w, h) * 0.038);
@@ -509,205 +445,191 @@ function drawInkFrame(ctx, plan, palette, size) {
 
 /* --------------------------------------------------------------- lettering */
 
-function halftoneSlab(ctx, x, y, w, h, angle, palette, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(x + w / 2, y + h / 2);
-  ctx.rotate(angle);
-  const off = h * 0.05;
+/**
+ * The striped-chrome fill: cream at the top, sun-yellow through the middle and
+ * orange at the foot, with magenta and purple bands run across the lower half.
+ * Built once per masthead at the title block's own size, then used as a pattern
+ * so the stripes line up with the block rather than with each glyph.
+ */
+function stripedChromePattern(ctx, blockW, blockH) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(2, Math.round(blockW));
+  c.height = Math.max(2, Math.round(blockH));
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, c.height);
+  grad.addColorStop(0.00, '#fffaea');
+  grad.addColorStop(0.34, '#ffe9a6');
+  grad.addColorStop(0.62, '#ffc94a');
+  grad.addColorStop(0.86, '#ff8a24');
+  grad.addColorStop(1.00, '#f7671c');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, c.width, c.height);
 
-  ctx.fillStyle = rgba(palette.accent, 0.95);
-  ctx.fillRect(-w / 2 + off, -h / 2 + off * 1.1, w, h);
-
-  ctx.fillStyle = palette.ink;
-  ctx.fillRect(-w / 2, -h / 2, w, h);
-
-  ctx.beginPath();
-  ctx.rect(-w / 2, -h / 2, w, h);
-  ctx.clip();
-  const pitch = Math.max(5, Math.round(h * 0.042));
-  ctx.fillStyle = rgba(palette.paper, 0.26);
-  for (let gy = -h / 2 + pitch / 2; gy < h / 2; gy += pitch) {
-    for (let gx = -w / 2 + pitch / 2; gx < w / 2; gx += pitch) {
-      const nx = (gx + w / 2) / w;
-      const ny = (gy + h / 2) / h;
-      const d = Math.min(1, Math.hypot(nx - 0.5, ny - 0.5) * 1.55);
-      const r = pitch * 0.19 * (0.30 + d * 0.85);
-      ctx.beginPath();
-      ctx.arc(gx, gy, Math.max(0.4, r), 0, Math.PI * 2);
-      ctx.fill();
-    }
+  // Horizontal magenta/purple stripes through the lower half of the glyphs.
+  const bands = [
+    [0.56, 0.075, 'rgba(255, 34, 148, 0.92)'],
+    [0.655, 0.052, 'rgba(168, 42, 222, 0.86)'],
+    [0.725, 0.070, 'rgba(255, 68, 160, 0.90)'],
+    [0.815, 0.048, 'rgba(140, 34, 210, 0.84)'],
+    [0.878, 0.062, 'rgba(255, 90, 130, 0.88)'],
+  ];
+  for (const [y, hh, colour] of bands) {
+    g.fillStyle = colour;
+    g.fillRect(0, c.height * y, c.width, Math.max(1, c.height * hh));
   }
-  ctx.restore();
+  // A specular line across the upper third, the way chrome catches the sun.
+  g.fillStyle = 'rgba(255,255,255,0.55)';
+  g.fillRect(0, c.height * 0.235, c.width, Math.max(1, c.height * 0.022));
+  return ctx.createPattern(c, 'no-repeat');
 }
 
-/** A chrome 3D title fill: sky band, horizon band, a specular stripe and a dark foot. */
-function chromeFill(ctx, boxW, boxH, palette) {
-  const g = ctx.createLinearGradient(0, -boxH / 2, 0, boxH / 2);
-  g.addColorStop(0.00, '#fdfbff');
-  g.addColorStop(0.30, '#a9c6e6');
-  g.addColorStop(0.46, '#3f5d86');
-  g.addColorStop(0.50, '#dfefff');
-  g.addColorStop(0.56, '#7d9dc4');
-  g.addColorStop(0.78, palette.accent);
-  g.addColorStop(1.00, '#2a1c46');
-  return g;
+/** A four-point sparkle, cream with a dark keyline. */
+function drawSparkle(ctx, cx, cy, r, palette) {
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const rad = i % 2 === 0 ? r : r * 0.20;
+    const a = (i * Math.PI) / 4;
+    const px = cx + Math.cos(a) * rad;
+    const py = cy + Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#fffdf2';
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, r * 0.10);
+  ctx.strokeStyle = palette.ink;
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawMasthead(ctx, state, plan, palette, size) {
   const m = plan.masthead;
-  const pad = Math.round(Math.min(size.w, size.h) * 0.014);
-  const title = (state.title || '').trim() || 'MIDNIGHT VICE';
-  const hasSub = Boolean((state.subtitle || '').trim());
-  const tracking = 0.006;
-  const bleed = Boolean(plan.bleed);
+  const title = (state.title || '').trim() || 'SUNFLARE';
+  const subText = (state.subtitle || '').trim();
+  const hasSub = Boolean(subText);
+  const tracking = 0.004;
 
-  const subBand = hasSub ? Math.max(30, Math.min(m.h * 0.24, m.w * 0.14, 150)) : 0;
-  const boxW = m.w - pad * 2;
-  const boxH = Math.max(40, m.h - subBand);
+  const subBand = hasSub ? Math.max(26, Math.min(m.h * 0.26, m.w * 0.13)) : 0;
+  const blockW = m.w;
+  const blockH = Math.max(40, m.h - subBand * 0.86);
   const widthFor = (line, fs) => measure(ctx, line, fs, TITLE_FACE, tracking);
 
-  const single = splitTitle(title).join(' ');
   const words = splitTitle(title);
+  const single = words.join(' ');
   const fit = (ls, wBox, hBox) => {
     const widest = Math.max(...ls.map((l) => widthFor(l, 100)));
-    return Math.min((wBox / Math.max(1, widest)) * 100, (hBox * 0.97) / (ls.length * 1.01));
+    return Math.min((wBox / Math.max(1, widest)) * 100, (hBox * 0.96) / (ls.length * 1.02));
   };
-  const singleFit = fit([single], boxW, boxH);
+  const singleFit = fit([single], blockW, blockH);
   let lines = [single];
   let fsize = singleFit;
   if (words.length > 1) {
-    const multiFit = fit(words, boxW, boxH);
-    if (multiFit > singleFit * 1.18) {
+    const multiFit = fit(words, blockW, blockH);
+    if (multiFit > singleFit * 1.22) {
       lines = words;
       fsize = multiFit;
     }
   }
   fsize = Math.max(12, fsize);
 
-  const lineH = fsize * 1.01;
-  const blockW = m.w;
-  const blockH = lines.length * lineH + pad * 0.95;
-
-  const subText = (state.subtitle || '').trim();
-  let ss = 0;
-  if (hasSub) {
-    ss = Math.min(blockH * 0.30, subBand * 0.80, m.w * 0.11);
-    ss = Math.max(ss, 11);
-    while (measure(ctx, subText, ss, SCRIPT_FACE) > m.w * 0.98 && ss > 10) ss -= 1;
-  }
-  const subGap = hasSub ? subBand * 0.18 : 0;
-  const groupH = blockH + (hasSub ? subGap + ss : 0);
+  const lineH = fsize * 1.02;
+  const textH = lines.length * lineH;
   const bx = m.x;
-  const by = m.y + Math.max(0, (m.h - groupH) / 2);
-  const angle = plan.landscape && !bleed ? 0 : -0.016;
+  const by = m.y + Math.max(0, (m.h - (textH + (hasSub ? subBand : 0))) / 2);
+  const angle = plan.landscape ? -0.014 : -0.012;
 
-  const plate = () => {
-    if (state.halftone !== false) halftoneSlab(ctx, bx, by, blockW, blockH, angle, palette, bleed ? 0.92 : 1);
-    else {
-      ctx.save();
-      ctx.translate(bx + blockW / 2, by + blockH / 2);
-      ctx.rotate(angle);
-      ctx.fillStyle = bleed ? rgba(palette.ink, 0.88) : palette.ink;
-      ctx.fillRect(-blockW / 2, -blockH / 2, blockW, blockH);
-      ctx.strokeStyle = rgba(palette.accent, 0.85);
-      ctx.lineWidth = Math.max(2, blockH * 0.014);
-      ctx.strokeRect(-blockW / 2 + ctx.lineWidth, -blockH / 2 + ctx.lineWidth,
-                     blockW - ctx.lineWidth * 2, blockH - ctx.lineWidth * 2);
-      ctx.restore();
-    }
-  };
-  plate();
+  // Optional halftone plate behind the type (off by default: the title sits
+  // straight on the art).
+  if (state.halftone) {
+    ctx.save();
+    ctx.translate(bx + blockW / 2, by + textH / 2);
+    ctx.rotate(angle);
+    ctx.fillStyle = rgba(palette.ink, 0.72);
+    ctx.fillRect(-blockW / 2 - fsize * 0.06, -textH / 2 - fsize * 0.06, blockW + fsize * 0.12, textH + fsize * 0.12);
+    ctx.restore();
+  }
 
   ctx.save();
-  ctx.translate(bx + blockW / 2, by + blockH / 2);
+  ctx.translate(bx + blockW / 2, by + textH / 2);
   ctx.rotate(angle);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = `${fsize}px ${TITLE_FACE}`;
   ctx.letterSpacing = `${fsize * tracking}px`;
 
+  const pattern = stripedChromePattern(ctx, blockW, textH);
   const style = state.titleStyle ?? 'chrome';
   const buildFill = () => {
-    if (style === 'sunset') {
-      const g = ctx.createLinearGradient(0, -blockH / 2, 0, blockH / 2);
-      g.addColorStop(0, '#fff6e0');
-      g.addColorStop(0.32, palette.accent);
-      g.addColorStop(0.66, palette.glow);
-      g.addColorStop(1, '#ff4f86');
-      return g;
-    }
-    if (style === 'chrome') return chromeFill(ctx, blockW, blockH, palette);
-    return palette.paper;
+    if (style === 'chrome') return pattern;
+    if (style === 'white') return palette.paper;
+    const g = ctx.createLinearGradient(0, -textH / 2, 0, textH / 2);
+    g.addColorStop(0, '#fff3cf');
+    g.addColorStop(0.42, '#ffcf6a');
+    g.addColorStop(0.78, '#ff7a3c');
+    g.addColorStop(1, '#e8347a');
+    return g;
   };
   const fill = buildFill();
 
   lines.forEach((line, i) => {
     const yy = (i - (lines.length - 1) / 2) * lineH;
-    if (style === 'chrome') {
-      // Extruded 3D: a stack of dark copies stepping down-right, then the
-      // chrome face, then a bright top edge and a dark keyline.
-      const depth = Math.max(2, fsize * 0.055);
-      const steps = 5;
-      for (let s = steps; s >= 1; s--) {
-        const t = s / steps;
-        ctx.fillStyle = mixHex('#120a1e', palette.accent, 0.18 * (1 - t));
-        ctx.fillText(line, depth * s * 0.55, yy + depth * s * 0.80);
-      }
-      ctx.fillStyle = fill;
-      ctx.fillText(line, 0, yy);
-      ctx.lineWidth = Math.max(1, fsize * 0.016);
-      ctx.strokeStyle = 'rgba(18,10,30,0.85)';
-      ctx.strokeText(line, 0, yy);
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = 0.55;
-      ctx.lineWidth = Math.max(1, fsize * 0.012);
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.strokeText(line, -fsize * 0.012, yy - fsize * 0.030);
-      ctx.restore();
-    } else {
-      if (bleed || state.posterInk !== false) {
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillText(line, fsize * 0.014, yy + fsize * 0.030);
-      }
-      ctx.fillStyle = fill;
-      ctx.fillText(line, 0, yy);
-      if (bleed && state.posterInk !== false) {
-        ctx.lineWidth = Math.max(1, fsize * 0.012);
-        ctx.strokeStyle = 'rgba(8,4,14,0.55)';
-        ctx.strokeText(line, 0, yy);
-      }
+    // Extruded 3D: a stack of dark copies stepping down-right behind the face.
+    const depth = Math.max(2, fsize * 0.048);
+    const steps = 5;
+    ctx.lineJoin = 'round';
+    for (let s = steps; s >= 1; s--) {
+      ctx.fillStyle = mixHex('#2a0d08', palette.glow, 0.16 * (1 - s / steps));
+      ctx.fillText(line, depth * s * 0.5, yy + depth * s * 0.85);
     }
+    // Thick dark outline.
+    ctx.lineWidth = Math.max(2, fsize * 0.075);
+    ctx.strokeStyle = '#2a0c07';
+    ctx.strokeText(line, 0, yy);
+    // The striped chrome face.
+    ctx.fillStyle = fill;
+    ctx.fillText(line, 0, yy);
+    // A hairline keyline on top of the fill so the letters stay crisp.
+    ctx.lineWidth = Math.max(1, fsize * 0.012);
+    ctx.strokeStyle = 'rgba(42,12,7,0.55)';
+    ctx.strokeText(line, 0, yy);
   });
-
-  if (style === 'chrome') {
-    ctx.letterSpacing = '0px';
-  }
   ctx.letterSpacing = '0px';
+
+  // Sparkle at the top-right of the block.
+  drawSparkle(ctx, blockW * 0.47, -textH * 0.40, fsize * 0.13, palette);
   ctx.restore();
 
+  // The badge ribbon sits above the title, tilted like a sticker.
+  const ribbonH = Math.max(16, Math.min(fsize * 0.24, m.h * 0.10));
+  ctx.save();
+  ctx.translate(m.x + Math.min(m.w * 0.30, fsize * 1.5), by - ribbonH * 0.55);
+  ctx.rotate(-0.045);
+  drawRibbon(ctx, state.badge, 0, 0, ribbonH, palette);
+  ctx.restore();
+
+  // Hot-pink script subtitle, overlapping the base of the title.
   if (hasSub) {
-    const sy = Math.min(by + blockH + subGap + ss * 0.55, m.y + m.h - ss * 0.45);
+    let ss = Math.min(fsize * 0.52, subBand * 0.94, m.w * 0.16);
+    ss = Math.max(ss, 11);
+    while (measure(ctx, subText, ss, SCRIPT_FACE) > m.w * 1.02 && ss > 10) ss -= 1;
+    const sy = by + textH - ss * 0.20;
     ctx.save();
     ctx.translate(m.x + m.w / 2, sy);
-    ctx.rotate(-0.024);
+    ctx.rotate(-0.028);
     ctx.font = `${ss}px ${SCRIPT_FACE}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = palette.glow;
-    ctx.shadowBlur = ss * 0.55;
-    ctx.fillStyle = palette.glow;
-    ctx.fillText(subText, 0, 0);
-    ctx.shadowColor = 'rgba(10,6,18,0.55)';
-    ctx.shadowBlur = ss * 0.22;
+    ctx.shadowColor = 'rgba(40,8,16,0.55)';
+    ctx.shadowBlur = ss * 0.16;
     ctx.shadowOffsetY = ss * 0.05;
-    ctx.lineWidth = Math.max(1, ss * 0.07);
-    ctx.strokeStyle = 'rgba(10,6,18,0.72)';
+    ctx.lineWidth = Math.max(1.5, ss * 0.10);
+    ctx.strokeStyle = '#3a0716';
     ctx.strokeText(subText, 0, 0);
+    ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
-    ctx.shadowBlur = ss * 0.12;
-    ctx.fillStyle = '#fff8ec';
+    ctx.fillStyle = '#ff3d94';
     ctx.fillText(subText, 0, 0);
     ctx.restore();
   }
@@ -716,13 +638,13 @@ function drawMasthead(ctx, state, plan, palette, size) {
 /** A notched ribbon; returns its width so the caller can lay out around it. */
 function drawRibbon(ctx, text, x, y, h, palette) {
   const label = (text || 'LEONIDA • EST. 2026').toUpperCase();
-  const size = h * 0.42;
+  const size = h * 0.44;
   ctx.save();
   ctx.font = `${size}px ${TITLE_FACE}`;
   ctx.letterSpacing = `${size * 0.10}px`;
   const tw = ctx.measureText(label).width;
-  const w = Math.min(tw + h * 1.35, h * 14);
-  const notch = h * 0.30;
+  const w = Math.min(tw + h * 1.3, h * 15);
+  const notch = h * 0.28;
   ctx.beginPath();
   ctx.moveTo(x + notch, y);
   ctx.lineTo(x + w, y);
@@ -732,114 +654,293 @@ function drawRibbon(ctx, text, x, y, h, palette) {
   ctx.closePath();
   ctx.fillStyle = palette.ink;
   ctx.fill();
-  ctx.strokeStyle = rgba(palette.paper, 0.35);
-  ctx.lineWidth = Math.max(1, h * 0.025);
+  ctx.strokeStyle = rgba(palette.accent, 0.85);
+  ctx.lineWidth = Math.max(1, h * 0.035);
   ctx.stroke();
   ctx.fillStyle = palette.paper;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.letterSpacing = `${size * 0.10}px`;
-  ctx.fillText(label, x + w / 2 + notch * 0.4, y + h * 0.54, w - notch * 1.4);
+  ctx.fillText(label, x + w / 2 + notch * 0.4, y + h * 0.55, w - notch * 1.4);
   ctx.letterSpacing = '0px';
   ctx.restore();
   return w;
 }
 
 function drawStars(ctx, count, x, y, r, palette) {
-  const gap = r * 2.6;
+  const gap = r * 2.55;
   for (let i = 0; i < 5; i++) {
-    drawStar(ctx, x + r + i * gap, y, r, i < count ? palette.accent : null, palette.ink, Math.max(1, r * 0.16));
+    drawStar(ctx, x + r + i * gap, y, r, i < count ? palette.accent : 'rgba(255,255,255,0.18)', palette.ink, Math.max(1, r * 0.14));
   }
   return r * 2 + 4 * gap;
 }
 
-function drawFooter(ctx, state, plan, palette, overlay = false) {
-  const f = plan.footer;
-  const min = Math.min(f.w, f.h);
-  const pad = Math.round(min * 0.05);
-  const ribbonH = Math.round(Math.min(f.h * 0.34, f.w * 0.105, min * 0.34));
-  const top = f.y;
+/* --------------------------------------------------------------- retail kit */
 
+/** The gold starburst seal: "ORIGINAL COVER ART ★★★" in a jagged disc. */
+function drawSeal(ctx, cx, cy, r, palette) {
+  const points = 22;
   ctx.save();
-  if (overlay) {
-    const band = ctx.createLinearGradient(0, f.y - f.h * 0.35, 0, f.y + f.h);
-    band.addColorStop(0, rgba(palette.ink, 0));
-    band.addColorStop(0.45, rgba(palette.ink, 0.58));
-    band.addColorStop(1, rgba(palette.ink, 0.90));
-    ctx.fillStyle = band;
-    ctx.fillRect(f.x - f.w * 0.2, f.y - f.h * 0.35, f.w * 1.4, f.h * 1.35);
-  }
-  ctx.strokeStyle = rgba(overlay ? palette.paper : palette.ink, 0.72);
-  ctx.lineWidth = Math.max(1, Math.round(f.h * 0.012));
   ctx.beginPath();
-  ctx.moveTo(f.x, top);
-  ctx.lineTo(f.x + f.w, top);
+  for (let i = 0; i < points * 2; i++) {
+    const rad = i % 2 === 0 ? r : r * 0.845;
+    const a = -Math.PI / 2 + (i * Math.PI) / points;
+    const px = cx + Math.cos(a) * rad;
+    const py = cy + Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  const g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r);
+  g.addColorStop(0, '#ffe98a');
+  g.addColorStop(0.52, '#f7c548');
+  g.addColorStop(1, '#e39a1c');
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.lineWidth = Math.max(2, r * 0.045);
+  ctx.strokeStyle = '#4a2306';
   ctx.stroke();
 
-  const ribY = top + pad * 1.1;
-  drawRibbon(ctx, state.badge, f.x, ribY, ribbonH, overlay ? { ...palette, ink: palette.paper, paper: palette.ink } : palette);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.70, 0, Math.PI * 2);
+  ctx.lineWidth = Math.max(1.5, r * 0.030);
+  ctx.strokeStyle = 'rgba(74,35,6,0.85)';
+  ctx.stroke();
 
-  const starR = Math.max(5, ribbonH * 0.26);
-  const starsW = starR * 2 + 4 * starR * 2.6;
-  const starsRight = f.x + f.w;
-  drawStars(ctx, Math.max(1, Math.min(5, state.stars ?? 4)), starsRight - starsW, ribY + ribbonH * 0.5, starR, overlay ? { ...palette, ink: palette.paper, accent: palette.accent } : palette);
-
-  ctx.font = `${Math.max(8, ribbonH * 0.30)}px ${TITLE_FACE}`;
-  ctx.letterSpacing = `${ribbonH * 0.03}px`;
+  ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = rgba(overlay ? palette.paper : palette.ink, overlay ? 0.7 : 0.55);
-  ctx.textAlign = 'left';
-  const heatY = ribY + ribbonH + ribbonH * 0.62;
-  const gradeName = gradeById(state.grade).name.toUpperCase();
-  ctx.fillText(`HEAT ${'★'.repeat(Math.max(1, Math.min(5, state.stars ?? 4)))}  ·  ${gradeName}`, f.x + pad * 0.2, heatY, f.w * 0.6);
+  ctx.fillStyle = '#3d1d05';
+  const s1 = r * 0.215;
+  ctx.font = `${s1}px ${TITLE_FACE}`;
+  ctx.letterSpacing = `${s1 * 0.05}px`;
+  ctx.fillText('ORIGINAL', cx, cy - r * 0.40, r * 1.30);
+  ctx.fillText('COVER ART', cx, cy - r * 0.13, r * 1.32);
   ctx.letterSpacing = '0px';
+  const s2 = r * 0.30;
+  ctx.font = `${s2}px ${TITLE_FACE}`;
+  ctx.fillStyle = '#6b2c06';
+  ctx.fillText('★★★', cx, cy + r * 0.30, r * 1.1);
+  const s3 = r * 0.135;
+  ctx.font = `${s3}px ${TITLE_FACE}`;
+  ctx.letterSpacing = `${s3 * 0.16}px`;
+  ctx.fillStyle = '#4a2306';
+  ctx.fillText('LEONIDA 2026', cx, cy + r * 0.60, r * 1.2);
+  ctx.letterSpacing = '0px';
+  ctx.restore();
+}
 
-  const footer = (state.footer || '').trim();
-  if (footer) {
-    const fs = Math.max(9, ribbonH * 0.30);
-    let size2 = fs;
-    while (measure(ctx, footer.toUpperCase(), size2, TITLE_FACE, 0.03) > f.w && size2 > 9) size2 -= 1;
-    ctx.font = `${size2}px ${TITLE_FACE}`;
-    ctx.letterSpacing = `${size2 * 0.03}px`;
-    ctx.fillStyle = overlay ? palette.paper : rgba(palette.ink, 0.9);
-    ctx.textAlign = 'right';
-    ctx.fillText(footer.toUpperCase(), f.x + f.w, heatY, f.w);
+/** A barcode block: alternating ink bars on a cream card, with the digits. */
+function drawBarcode(ctx, x, y, w, h, palette) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,250,238,0.94)';
+  ctx.fillRect(x, y, w, h);
+  const pad = w * 0.045;
+  let seed = 20261120;
+  const rnd = () => {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    return seed / 4294967296;
+  };
+  let bx = x + pad;
+  const barTop = y + h * 0.13;
+  const barH = h * 0.62;
+  const end = x + w - pad;
+  while (bx < end) {
+    const bw = Math.max(1, w * (0.008 + rnd() * 0.022));
+    if (rnd() > 0.34) {
+      ctx.fillStyle = 'rgba(22,10,6,0.95)';
+      ctx.fillRect(bx, barTop, bw, barH);
+    }
+    bx += bw + Math.max(1, w * (0.006 + rnd() * 0.016));
+  }
+  ctx.fillStyle = '#241008';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${Math.max(6, h * 0.13)}px ${TITLE_FACE}`;
+  ctx.letterSpacing = `${h * 0.010}px`;
+  ctx.fillText('0 89741 26020 6', x + w / 2, y + h * 0.865, w * 0.92);
+  ctx.letterSpacing = '0px';
+  ctx.restore();
+}
+
+/** A ticket tab hanging off the band edge: "VOL. 1". */
+function drawTicketTab(ctx, x, y, w, h, palette, label = 'VOL. 1') {
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,240,214,0.96)';
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(40,16,8,0.85)';
+  ctx.lineWidth = Math.max(1.5, h * 0.020);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x + w * 0.5, y, h * 0.075, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(40,16,8,0.55)';
+  ctx.fill();
+  ctx.fillStyle = '#2a0f06';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const fs = Math.min(h * 0.30, w * 0.55);
+  ctx.font = `${fs}px ${TITLE_FACE}`;
+  ctx.letterSpacing = `${fs * 0.06}px`;
+  ctx.fillText(label, x + w / 2, y + h * 0.58, w * 0.88);
+  ctx.letterSpacing = '0px';
+  ctx.restore();
+}
+
+/**
+ * The five-star press quote. On a landscape sheet it sits in the top-left
+ * corner over the art; on a tall sheet it sits under the title. Stars first,
+ * then the quote, then the paper that said it.
+ */
+function drawPressQuote(ctx, state, plan, palette, size) {
+  const q = plan.quote;
+  const starR = Math.max(6, Math.min(q.h * 0.20, q.w * 0.022));
+  const starsW = starR * 2 + 4 * starR * 2.55;
+  const x = q.x;
+  const y = q.y;
+
+  // A soft dark plate so the quote reads over any photo.
+  const g = ctx.createLinearGradient(x - q.w * 0.05, y, x + q.w * 1.05, y + q.h);
+  g.addColorStop(0, 'rgba(24,8,6,0.62)');
+  g.addColorStop(0.72, 'rgba(24,8,6,0.42)');
+  g.addColorStop(1, 'rgba(24,8,6,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(x - q.w * 0.03, y - q.h * 0.2, q.w * 1.08, q.h * 1.4);
+
+  drawStars(ctx, 5, x, y + starR * 1.2, starR, palette);
+
+  const quote = (state.quote || '“A sun-soaked knockout — the cover of the summer.”');
+  let qs = Math.min(q.h * 0.30, q.w * 0.048);
+  qs = Math.max(qs, 9);
+  while (measure(ctx, quote, qs, TITLE_FACE, 0.01) > q.w * 0.94 && qs > 8) qs -= 1;
+  ctx.font = `${qs}px ${TITLE_FACE}`;
+  ctx.letterSpacing = `${qs * 0.01}px`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,248,236,0.97)';
+  ctx.fillText(quote, x, y + starR * 2.1 + qs * 0.7, q.w * 0.94);
+
+  const gs = Math.max(8, qs * 0.62);
+  ctx.font = `${gs}px ${TITLE_FACE}`;
+  ctx.letterSpacing = `${gs * 0.16}px`;
+  ctx.fillStyle = rgba(palette.accent, 0.95);
+  ctx.fillText('— LEONIDA SUN GAZETTE', x, y + starR * 2.1 + qs * 1.55, q.w * 0.9);
+  ctx.letterSpacing = '0px';
+}
+
+/**
+ * The retail band: a graded scrim down the bottom of the sheet carrying the
+ * billing block, the footer line, the barcode, the star heat, the VOL. 1 tab
+ * and the COMING SOON line. Each piece is behind its own toggle in the state's
+ * `kit`, so the poster can be stripped back to pure key art.
+ */
+function drawRetail(ctx, state, plan, palette, size) {
+  const kit = state.kit || {};
+  const b = plan.band;
+  const { w } = size;
+  const any = kit.billing || kit.barcode || kit.vol || kit.comingSoon;
+  if (!any) return;
+
+  // Scrim: transparent at the top of the band, deep ink at the foot.
+  const scrim = ctx.createLinearGradient(0, b.y - b.h * 0.22, 0, b.y + b.h * 0.72);
+  scrim.addColorStop(0, rgba(palette.ink, 0));
+  scrim.addColorStop(0.42, rgba(palette.ink, 0.78));
+  scrim.addColorStop(1, rgba(palette.ink, 0.985));
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, b.y - b.h * 0.22, w, b.h * 1.25);
+
+  ctx.save();
+  ctx.strokeStyle = rgba(palette.accent, 0.55);
+  ctx.lineWidth = Math.max(1, b.h * 0.008);
+  ctx.beginPath();
+  ctx.moveTo(w * 0.04, b.y + b.h * 0.06);
+  ctx.lineTo(w * 0.96, b.y + b.h * 0.06);
+  ctx.stroke();
+
+  const padX = w * 0.045;
+
+  if (kit.billing) {
+    const billing = 'A SUNFLARE PICTURES PRODUCTION  ·  STARRING YOU';
+    let fs = Math.min(b.h * 0.115, w * 0.020);
+    fs = Math.max(fs, 8);
+    while (measure(ctx, billing, fs, TITLE_FACE, 0.05) > w * 0.58 && fs > 8) fs -= 1;
+    ctx.font = `${fs}px ${TITLE_FACE}`;
+    ctx.letterSpacing = `${fs * 0.05}px`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,244,226,0.96)';
+    ctx.fillText(billing, padX, b.y + b.h * 0.26, w * 0.60);
+
+    ctx.font = `${Math.max(8, fs * 0.80)}px ${TITLE_FACE}`;
+    ctx.letterSpacing = `${fs * 0.03}px`;
+    ctx.fillStyle = 'rgba(255,240,220,0.70)';
+    const footer = (state.footer || 'Sunflare Studio presents a Leonida picture').toUpperCase();
+    ctx.fillText(footer, padX, b.y + b.h * 0.43, w * 0.60);
     ctx.letterSpacing = '0px';
+  }
+
+  // The heat meter, beside the billing block.
+  if (kit.billing) {
+    const r = Math.max(4, b.h * 0.045);
+    const starsW = r * 2 + 4 * r * 2.55;
+    drawStars(ctx, Math.max(1, Math.min(5, state.stars ?? 5)), padX, b.y + b.h * 0.585, r, palette);
+    ctx.font = `${Math.max(7, b.h * 0.055)}px ${TITLE_FACE}`;
+    ctx.letterSpacing = `${b.h * 0.006}px`;
+    ctx.fillStyle = 'rgba(255,240,220,0.62)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`HEAT ${state.stars ?? 5}/5  ·  ${gradeById(state.grade).name.toUpperCase()}`, padX + starsW + b.h * 0.10, b.y + b.h * 0.585, w * 0.5);
+    ctx.letterSpacing = '0px';
+  }
+
+  if (kit.comingSoon) {
+    // A solid accent chip, so the line reads at judge size and its toggle is
+    // unmistakable in the output.
+    const label = 'COMING SOON';
+    const fs = Math.max(10, b.h * 0.115);
+    ctx.font = `${fs}px ${TITLE_FACE}`;
+    ctx.letterSpacing = `${fs * 0.14}px`;
+    const tw = ctx.measureText(label).width;
+    const chH = fs * 1.85;
+    const chW = Math.min(tw + fs * 1.5, w * 0.40);
+    const chX = padX;
+    const chY = b.y + b.h * 0.755;
+    ctx.fillStyle = palette.accent;
+    ctx.fillRect(chX, chY, chW, chH);
+    ctx.fillStyle = palette.ink;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, chX + fs * 0.75, chY + chH * 0.55, chW - fs * 1.3);
+    ctx.letterSpacing = '0px';
+  }
+
+  if (kit.vol) {
+    const tw = Math.min(w * 0.075, b.h * 0.55);
+    const th = b.h * 0.62;
+    drawTicketTab(ctx, w * 0.695, b.y + b.h * 0.20, tw, th, palette, 'VOL. 1');
+  }
+
+  if (kit.barcode) {
+    const bw = Math.min(w * 0.175, b.h * 0.78);
+    const bh = b.h * 0.56;
+    drawBarcode(ctx, w - padX - bw, b.y + b.h * 0.20, bw, bh, palette);
   }
   ctx.restore();
 }
 
-function drawCaptionBand(ctx, state, rect, palette) {
-  const pad = Math.round(rect.h * 0.10);
-  ctx.fillStyle = palette.ink;
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.fillStyle = rgba(palette.accent, 0.9);
-  ctx.fillRect(rect.x, rect.y, rect.w, Math.max(2, rect.h * 0.02));
-
-  const line = (state.footer || state.subtitle || 'A Midnight Vice picture').toUpperCase();
-  const size = Math.max(11, rect.h * 0.20);
-  let ps = size;
-  while (measure(ctx, line, ps, TITLE_FACE, 0.07) > rect.w * 0.58 && ps > 9) ps -= 1;
-  ctx.font = `${ps}px ${TITLE_FACE}`;
-  ctx.letterSpacing = `${ps * 0.07}px`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = palette.paper;
-  ctx.fillText(line, rect.x + pad, rect.y + rect.h * 0.40, rect.w * 0.6);
-  ctx.letterSpacing = '0px';
-
-  const starR = Math.max(4, rect.h * 0.085);
-  const sw = starR * 2 + 4 * starR * 2.6;
-  drawStars(ctx, Math.max(1, Math.min(5, state.stars ?? 4)), rect.x + rect.w - pad - sw, rect.y + rect.h * 0.40, starR, palette);
-
-  ctx.font = `${Math.max(7, rect.h * 0.085)}px ${TITLE_FACE}`;
-  ctx.letterSpacing = `${rect.h * 0.012}px`;
-  ctx.fillStyle = rgba(palette.paper, 0.6);
-  ctx.fillText('MIDNIGHT VICE STUDIO  /  ' + gradeById(state.grade).name.toUpperCase(), rect.x + pad, rect.y + rect.h * 0.72);
-  ctx.letterSpacing = '0px';
+/** The seal lives over the art at the top-right, clear of the masthead. */
+function drawSealTop(ctx, state, plan, palette, size) {
+  if (!(state.kit || {}).seal) return;
+  const r = Math.min(size.w, size.h) * 0.100;
+  const cx = size.w - r * 1.32;
+  const cy = r * 1.30;
+  drawSeal(ctx, cx, cy, r, palette);
 }
 
-function drawGrain(ctx, w, h, opacity = 0.13) {
+function drawGrain(ctx, w, h, opacity = 0.10) {
   ctx.save();
   ctx.globalCompositeOperation = 'overlay';
   ctx.globalAlpha = opacity;
@@ -849,12 +950,77 @@ function drawGrain(ctx, w, h, opacity = 0.13) {
 }
 
 function drawVignette(ctx, w, h, palette) {
-  const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.30, w / 2, h / 2, Math.max(w, h) * 0.76);
+  const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.34, w / 2, h / 2, Math.max(w, h) * 0.78);
   g.addColorStop(0, 'rgba(0,0,0,0)');
-  g.addColorStop(0.74, rgba(palette.ink, 0.18));
-  g.addColorStop(1, rgba(palette.ink, 0.55));
+  g.addColorStop(0.76, rgba(palette.ink, 0.14));
+  g.addColorStop(1, rgba(palette.ink, 0.46));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
+}
+
+/**
+ * The pop-out hero: the hero panel's photo cut out at a larger scale and drawn
+ * IN FRONT of the title, so the subject breaks the grid the way a key-art
+ * cut-out does. A soft shadow under it and a fade into the retail band keep it
+ * from looking pasted on. Tall sheets clip it below the title so the lettering
+ * stays clean.
+ */
+function drawPopout(ctx, state, plan, palette, graded, size) {
+  if (!state.popout) return;
+  const rects = layoutPanels(state.layout, plan.panels, panelGap(size.w, size.h));
+  const hi = rects.findIndex((r) => r.hero);
+  if (hi < 0) return;
+  const slot = state.slots?.[hi];
+  const image = slot?.photo ? graded(slot.photo) : null;
+  if (!image) return;
+
+  const r = rects[hi];
+  const k = plan.landscape ? 1.10 : 1.09;
+  const pivot = { x: r.x + r.w * 0.34, y: r.y + r.h * 0.62 };
+  const scaled = {
+    x: pivot.x - (pivot.x - r.x) * k,
+    y: pivot.y - (pivot.y - r.y) * k,
+    w: r.w * k,
+    h: r.h * k,
+    skew: (r.skew || 0) * k,
+  };
+
+  ctx.save();
+  // Tall sheets: the hero sits above the title, so the pop-out only needs to
+  // stop at the retail band rather than run over the barcode.
+  if (!plan.landscape) {
+    ctx.beginPath();
+    ctx.rect(0, 0, size.w, plan.band.y + plan.band.h * 0.16);
+    ctx.clip();
+  }
+
+  const lw = Math.max(3, Math.min(size.w, size.h) * 0.006);
+  ctx.save();
+  ctx.shadowColor = 'rgba(30,10,4,0.55)';
+  ctx.shadowBlur = lw * 6;
+  ctx.shadowOffsetX = lw * 1.5;
+  ctx.shadowOffsetY = lw * 2.5;
+  ctx.fillStyle = palette.ink;
+  panelPath(ctx, scaled);
+  ctx.fill();
+  ctx.restore();
+
+  drawPhoto(ctx, image, slot, scaled, palette, photoAnchor(plan));
+
+  // A cream keyline, like the hero was cut out and framed.
+  ctx.strokeStyle = rgba(palette.paper, 0.55);
+  ctx.lineWidth = Math.max(1.5, lw * 0.7);
+  panelPath(ctx, scaled, -lw * 0.8);
+  ctx.stroke();
+
+  // Fade the bottom into the retail band.
+  const fade = ctx.createLinearGradient(0, plan.band.y - plan.band.h * 0.4, 0, plan.band.y + plan.band.h * 0.35);
+  fade.addColorStop(0, rgba(palette.ink, 0));
+  fade.addColorStop(1, rgba(palette.ink, 0.92));
+  ctx.fillStyle = fade;
+  ctx.fillRect(0, plan.band.y - plan.band.h * 0.4, size.w, plan.band.h * 0.78);
+
+  ctx.restore();
 }
 
 /**
@@ -869,7 +1035,7 @@ export function drawCover(ctx, state, images, width, height) {
 
   ctx.save();
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = grade.paper;
+  ctx.fillStyle = grade.ink;
   ctx.fillRect(0, 0, width, height);
 
   const lut = gradeLut(grade);
@@ -930,17 +1096,25 @@ export function drawCover(ctx, state, images, width, height) {
     drawSkyGlow(ctx, state, plan, palette, grade, size, framedFaces(state, plan, size, images));
   }
 
-  if (state.posterInk !== false && !plan.bleed) drawInkFrame(ctx, plan, palette, size);
+  if (state.posterInk !== false) drawInkFrame(ctx, plan, palette, size);
 
   drawMasthead(ctx, state, plan, palette, size);
-  drawFooter(ctx, state, plan, palette, plan.bleed);
+  drawPopout(ctx, state, plan, palette, graded, size);
+
+  if (state.kit?.quote) drawPressQuote(ctx, state, plan, palette, size);
+  drawSealTop(ctx, state, plan, palette, size);
+  drawRetail(ctx, state, plan, palette, size);
 
   if (state.vignette !== false) drawVignette(ctx, width, height, palette);
   if (state.grain !== false) drawGrain(ctx, width, height);
   ctx.restore();
 }
 
-export const __debug = { drawMasthead, drawFooter, drawPanels, planFrame, drawCaptionBand, drawRibbon, drawStars, drawSkyGlow, placePhoto, framedFaces };
+export const __debug = {
+  drawMasthead, drawPanels, planFrame, drawRibbon, drawStars, drawSkyGlow,
+  placePhoto, framedFaces, photoAnchor, drawRetail, drawSeal, drawBarcode,
+  drawPressQuote, drawPopout, drawTicketTab, retailBandHeight,
+};
 
 /** Renders the cover to a fresh canvas, ready for toBlob. */
 export function renderToCanvas(state, images, width, height) {

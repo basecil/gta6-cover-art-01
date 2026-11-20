@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Midnight Vice — Leonida after dark cover studio</title>
-<meta name="description" content="Turn any photo into a full-bleed night poster — neon grades, chrome 3D lettering, role tags — and export PNGs at four sizes.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%230a0a1e%22/%3E%3Cpath d=%22M7 22 L16 7 L25 22 Z%22 fill=%22none%22 stroke=%22%235ce1e6%22 stroke-width=%222.4%22/%3E%3Cpath d=%22M11 22 L16 14 L21 22%22 fill=%22none%22 stroke=%22%23ff4d8d%22 stroke-width=%222%22/%3E%3C/svg%3E">
+<title>Sunflare — Leonida in golden light cover studio</title>
+<meta name="description" content="Turn any photo into a golden-hour key-art poster — hero mosaic, sun grades, striped chrome lettering, a full retail kit — and export PNGs at four sizes.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%231a0c08%22/%3E%3Ccircle cx=%2216%22 cy=%2217%22 r=%227%22 fill=%22%23ffb45e%22/%3E%3Cpath d=%22M2 23 L30 23 L30 30 L2 30 Z%22 fill=%22%23e8347a%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -13,21 +13,21 @@
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
-      <span class="brand-name"><b>MIDNIGHT VICE</b><span>Leonida after dark</span></span>
+      <span class="brand-name"><b>SUNFLARE</b><span>Leonida in golden light</span></span>
     </div>
 
     <div class="fields">
       <label class="field field-title">
         <span>Title</span>
-        <input id="title" type="text" maxlength="28" value="Midnight Vice" autocomplete="off" spellcheck="false">
+        <input id="title" type="text" maxlength="28" value="Sunflare" autocomplete="off" spellcheck="false">
       </label>
       <label class="field field-script">
         <span>Subtitle</span>
-        <input id="subtitle" type="text" maxlength="34" value="Leonida after dark" autocomplete="off" spellcheck="false">
+        <input id="subtitle" type="text" maxlength="34" value="Leonida in golden light" autocomplete="off" spellcheck="false">
       </label>
       <label class="field field-script field-footer">
         <span>Footer</span>
-        <input id="footer" type="text" maxlength="40" value="Midnight Vice Studio presents" autocomplete="off" spellcheck="false">
+        <input id="footer" type="text" maxlength="44" value="Sunflare Pictures presents" autocomplete="off" spellcheck="false">
       </label>
     </div>
 
@@ -36,7 +36,7 @@
         <button id="undo" class="icon" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">&#8630;</button>
         <button id="redo" class="icon" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">&#8631;</button>
       </div>
-      <button id="surprise" class="ghost neon" type="button" title="Give every panel its own photo and crop">Surprise me</button>
+      <button id="surprise" class="ghost sun" type="button" title="Give every panel its own photo and crop">Surprise me</button>
       <button id="shuffle" class="ghost" type="button" title="Random layout, grade and title">Shuffle</button>
       <div class="exports">
         <select id="exportSize" aria-label="Export size">
@@ -54,12 +54,12 @@
   <main class="workbench">
     <aside class="rail rail-left" aria-label="Layouts, grades and photos">
       <section class="group">
-        <h2>Layout <span id="layoutName" class="muted">Full-Bleed Hero</span></h2>
+        <h2>Layout <span id="layoutName" class="muted">Hero Mosaic</span></h2>
         <div id="layoutGrid" class="layout-grid" role="radiogroup" aria-label="Layout"></div>
       </section>
 
       <section class="group">
-        <h2>Grade <span class="muted">night palette</span></h2>
+        <h2>Grade <span class="muted">golden hour</span></h2>
         <div id="gradeGrid" class="grade-grid" role="radiogroup" aria-label="Colour grade"></div>
       </section>
 
@@ -106,15 +106,19 @@
       <section class="group">
         <h2>Lettering</h2>
         <div class="seg wide" id="titleStyle" role="radiogroup" aria-label="Title fill">
-          <button data-style="white" type="button">White</button>
-          <button data-style="chrome" class="on" type="button">Chrome 3D</button>
-          <button data-style="sunset" type="button">Neon</button>
+          <button data-style="chrome" class="on" type="button">Chrome</button>
+          <button data-style="white" type="button">Cream</button>
+          <button data-style="sunset" type="button">Sunset</button>
         </div>
-        <label class="switch"><input id="halftone" type="checkbox" checked> <span>Halftone block</span></label>
+        <label class="switch"><input id="halftone" type="checkbox"> <span>Halftone plate</span></label>
         <label class="switch"><input id="roleTags" type="checkbox" checked> <span>Role tags per panel</span></label>
         <label class="field stacked">
           <span>Badge ribbon</span>
           <input id="badge" type="text" maxlength="22" value="LEONIDA • EST. 2026" spellcheck="false">
+        </label>
+        <label class="field stacked">
+          <span>Press quote</span>
+          <input id="quote" type="text" maxlength="70" value="“A sun-soaked knockout — the cover of the summer.”" spellcheck="false">
         </label>
         <div class="heat">
           <span class="heat-label">Heat</span>
@@ -142,14 +146,24 @@
       </section>
 
       <section class="group">
-        <h2>Finish</h2>
+        <h2>Poster Finish</h2>
         <label class="switch"><input id="posterInk" type="checkbox" checked> <span>Poster ink frame</span></label>
         <label class="switch"><input id="skyGlow" type="checkbox" checked> <span>Sky glow</span></label>
+        <label class="switch"><input id="popout" type="checkbox" checked> <span>Pop-out hero (in front of title)</span></label>
         <label class="switch"><input id="compare" type="checkbox"> <span>Before / after (original)</span></label>
         <label class="switch"><input id="grain" type="checkbox" checked> <span>Film grain</span></label>
         <label class="switch"><input id="vignette" type="checkbox" checked> <span>Vignette</span></label>
+        <div class="kit">
+          <p class="hint kit-head">Retail kit</p>
+          <label class="switch"><input id="kitSeal" type="checkbox" checked> <span>Gold seal</span></label>
+          <label class="switch"><input id="kitBarcode" type="checkbox" checked> <span>Barcode</span></label>
+          <label class="switch"><input id="kitBilling" type="checkbox" checked> <span>Billing block</span></label>
+          <label class="switch"><input id="kitQuote" type="checkbox" checked> <span>Press quote</span></label>
+          <label class="switch"><input id="kitVol" type="checkbox" checked> <span>VOL. 1 tab</span></label>
+          <label class="switch"><input id="kitComingSoon" type="checkbox" checked> <span>Coming Soon</span></label>
+        </div>
         <div class="preset-hint">
-          <p class="hint">Three named night looks: <b>Vice Standard</b>, <b>Midnight Run</b>, <b>Afterdark Noir</b>.</p>
+          <p class="hint">Three named sun looks: <b>Golden Standard</b>, <b>Coral Summer</b>, <b>Sunset Strip</b>.</p>
         </div>
       </section>
     </aside>

@@ -1,96 +1,99 @@
-// Eight gradient-map colour grades for Midnight Vice. A grade is a luminance
-// ramp: every pixel's brightness picks a colour from `stops`, which is what
-// gives every panel one palette. `paper` is the cream, `ink` the poster black,
-// `glow` the neon accent used for script, ribbon and stars.
+// Eight gradient-map colour grades for Sunflare, tuned to golden hour: every
+// palette runs from a warm dusk shadow to a sunlit cream, and the two accent
+// grades (Palm Teal, Neon Night) keep their cool light in the sky stops only.
+// `paper` is the cream, `ink` the poster black, `glow` the accent used for the
+// script, ribbon and stars.
 //
 // Skin-safe by construction. A lit face sits in the upper mid-tones of a photo,
 // so the lookup keeps a warm light band there (SKIN_WARM, a peach) whatever the
-// palette does elsewhere; and gradePixel() additionally detects skin-coloured
+// palette does elsewhere; and gradePixel() additionally detects skin-toned
 // source pixels and keeps them on that warm band. Between the two, no grade --
 // teal, violet or black-and-white -- can turn a face green or purple.
 
 export const GRADES = [
   {
-    id: 'vice',
-    name: 'Vice Sunset',
-    stops: ['#160a2e', '#3d1457', '#8e2767', '#e14f63', '#ff9a5a', '#ffe4c8'],
-    paper: '#f6ead4',
-    ink: '#120b18',
-    glow: '#ff7a6b',
-    accent: '#ffb066',
-    swatch: ['#3d1457', '#e14f63', '#ffe4c8'],
+    id: 'golden',
+    name: 'Golden Hour',
+    stops: ['#2a1216', '#5c2418', '#a8451f', '#e07a2a', '#f7b25e', '#fff3da'],
+    paper: '#fff2d8',
+    ink: '#1a0c08',
+    glow: '#ffb45e',
+    accent: '#ffe0a0',
+    swatch: ['#a8451f', '#e07a2a', '#fff3da'],
   },
   {
-    id: 'neon',
-    name: 'Neon Night',
-    stops: ['#04060f', '#111646', '#243a94', '#5b49c9', '#c06be6', '#ffe4e4'],
-    paper: '#e9ecf7',
-    ink: '#080a14',
-    glow: '#c07bff',
-    accent: '#7fe3ff',
-    swatch: ['#111646', '#5b49c9', '#ffe4e4'],
+    id: 'coral',
+    name: 'Coral Dusk',
+    stops: ['#2a1220', '#6b2130', '#b83c48', '#f0675f', '#ffa07e', '#fff0e2'],
+    paper: '#fff0e2',
+    ink: '#1c0c10',
+    glow: '#ff8a72',
+    accent: '#ffc9a6',
+    swatch: ['#b83c48', '#f0675f', '#fff0e2'],
+  },
+  {
+    id: 'vice',
+    name: 'Vice Sunset',
+    stops: ['#2b1035', '#6a1b52', '#b33169', '#ef5a76', '#ff9a72', '#ffe6c8'],
+    paper: '#ffeada',
+    ink: '#1b0a18',
+    glow: '#ff7a86',
+    accent: '#ffbe86',
+    swatch: ['#6a1b52', '#ef5a76', '#ffe6c8'],
+  },
+  {
+    id: 'strip',
+    name: 'Sunset Strip',
+    stops: ['#241028', '#5d1c3f', '#a93a52', '#e86a52', '#ffae62', '#fff1dc'],
+    paper: '#fff1dc',
+    ink: '#180a14',
+    glow: '#ff9a5c',
+    accent: '#ffd28c',
+    swatch: ['#a93a52', '#e86a52', '#fff1dc'],
+  },
+  {
+    id: 'heat',
+    name: 'Heatwave',
+    stops: ['#2a0f08', '#5e1c0c', '#ab3b12', '#ef7620', '#ffb055', '#fff0da'],
+    paper: '#fff2dc',
+    ink: '#1a0905',
+    glow: '#ff8c38',
+    accent: '#ffd08a',
+    swatch: ['#ab3b12', '#ef7620', '#fff0da'],
   },
   {
     id: 'palm',
     name: 'Palm Teal',
-    stops: ['#041c1b', '#0a3d3b', '#126b63', '#22a08f', '#8fe0c4', '#fff0e2'],
-    paper: '#eaf4e9',
-    ink: '#071512',
-    glow: '#5ef0cf',
+    stops: ['#062023', '#0f3f42', '#1f6f6a', '#4a9a86', '#c9cf94', '#fff0d8'],
+    paper: '#fff4de',
+    ink: '#061715',
+    glow: '#6fe0c0',
     accent: '#ffd98a',
-    swatch: ['#0a3d3b', '#22a08f', '#fff0e2'],
+    swatch: ['#0f3f42', '#4a9a86', '#fff0d8'],
   },
   {
-    id: 'heat',
-    name: 'Heat Haze',
-    stops: ['#1c0805', '#4c160b', '#9c3314', '#e2681f', '#ffab52', '#ffeeda'],
-    paper: '#f7ecd8',
-    ink: '#170a06',
-    glow: '#ff9147',
-    accent: '#ffd489',
-    swatch: ['#4c160b', '#e2681f', '#ffeeda'],
+    id: 'neon',
+    name: 'Neon Night',
+    stops: ['#0f1030', '#2a2a66', '#52509e', '#9b7fc4', '#ffc08e', '#fff0e2'],
+    paper: '#fff1e4',
+    ink: '#0a0a1c',
+    glow: '#c58bff',
+    accent: '#ffb27a',
+    swatch: ['#2a2a66', '#9b7fc4', '#fff0e2'],
   },
   {
     id: 'noir',
     name: 'Mono Noir',
-    stops: ['#050506', '#232326', '#56565c', '#909098', '#d8cfc7', '#ffffff'],
-    paper: '#f1f0ee',
-    ink: '#08080a',
-    glow: '#e6e6ee',
-    accent: '#d6cbc0',
-    swatch: ['#232326', '#909098', '#ffffff'],
-  },
-  {
-    id: 'golden',
-    name: 'Golden Hour',
-    stops: ['#1a0f22', '#4b2338', '#94443f', '#d1794c', '#f2b276', '#fff2dc'],
-    paper: '#f9eed7',
-    ink: '#160d13',
-    glow: '#ffb86b',
-    accent: '#ffe3a5',
-    swatch: ['#4b2338', '#d1794c', '#fff2dc'],
-  },
-  {
-    id: 'midnight',
-    name: 'Midnight Neon',
-    stops: ['#02030a', '#0b1238', '#1a2a72', '#40339c', '#9a5cd8', '#ffe6ec'],
-    paper: '#e9e4f8',
-    ink: '#04050e',
-    glow: '#8f7bff',
-    accent: '#67e8ff',
-    swatch: ['#0b1238', '#40339c', '#ffe6ec'],
-  },
-  {
-    id: 'afterdark',
-    name: 'Afterdark Noir',
-    stops: ['#010102', '#141419', '#37343e', '#6d6868', '#bdb0a4', '#fff6ee'],
-    paper: '#efeae4',
-    ink: '#020203',
-    glow: '#ff7a8a',
-    accent: '#ffc9a0',
-    swatch: ['#141419', '#6d6868', '#fff6ee'],
+    stops: ['#0d0b0a', '#2a2521', '#5c5147', '#94816c', '#d9c3a5', '#fff6e8'],
+    paper: '#fff6e8',
+    ink: '#0b0908',
+    glow: '#f0e2cc',
+    accent: '#e8d2ac',
+    swatch: ['#2a2521', '#94816c', '#fff6e8'],
   },
 ];
+
+export const DEFAULT_GRADE = 'golden';
 
 export const GRADE_IDS = GRADES.map((grade) => grade.id);
 
@@ -152,7 +155,7 @@ function smoothstep(a, b, x) {
 
 /** How far a luminance sits inside the band a lit face occupies. */
 export function skinBand(t) {
-  return smoothstep(0.16, 0.30, t) * (1 - smoothstep(0.90, 0.995, t));
+  return smoothstep(0.14, 0.28, t) * (1 - smoothstep(0.90, 0.995, t));
 }
 
 /**
